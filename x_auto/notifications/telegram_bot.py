@@ -165,10 +165,17 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
 
             post_link = post.get("post_link", "")
             if not post_link:
-                # Fallback: construct link from post_id
+                # Fallback: construct link from post_id with author for mobile deep linking
                 post_id = post.get("post_id", "")
                 if post_id:
-                    post_link = f"https://x.com/i/web/status/{post_id}"
+                    # Try to get author from nested post data for standard URL format
+                    post_data = post.get("post", {})
+                    author = post_data.get("author", {}).get("userName", "")
+                    if author:
+                        # Standard format triggers iOS/Android Universal Links for X app
+                        post_link = f"https://x.com/{author}/status/{post_id}"
+                    else:
+                        post_link = f"https://x.com/i/web/status/{post_id}"
 
             if post_link:
                 message_parts.append(f"→ [{summary_escaped}]({post_link})")
