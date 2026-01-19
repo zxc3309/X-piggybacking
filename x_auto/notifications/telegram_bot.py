@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import os
 import logging
+import asyncio
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from telegram import Bot
-from telegram.error import TelegramError, NetworkError, Unauthorized
+from telegram.error import TelegramError, NetworkError, Forbidden
 from telegram.constants import ParseMode
 
 # Configure logging
@@ -43,6 +44,48 @@ CATEGORY_DISPLAY_NAMES = {
 MAX_MESSAGE_LENGTH = 4000  # Leave buffer below 4096 limit
 
 
+async def _send_message_async(bot_token: str, chat_id: str, message: str, parse_mode: str) -> bool:
+    """
+    Async helper to send a message to Telegram.
+
+    Args:
+        bot_token: Telegram bot token
+        chat_id: Telegram chat ID
+        message: Message text to send
+        parse_mode: Telegram parse mode (Markdown or HTML)
+
+    Returns:
+        True if message sent successfully, False otherwise
+    """
+    try:
+        bot = Bot(token=bot_token)
+        async with bot:
+            await bot.send_message(
+                chat_id=chat_id,
+                text=message,
+                parse_mode=parse_mode,
+                disable_web_page_preview=False  # Show link previews
+            )
+        logger.info(f"Telegram message sent successfully to chat {chat_id}")
+        return True
+
+    except Forbidden as e:
+        logger.critical(f"Telegram bot token is invalid or unauthorized: {e}")
+        return False
+
+    except NetworkError as e:
+        logger.error(f"Telegram network error: {e}")
+        return False
+
+    except TelegramError as e:
+        logger.error(f"Telegram API error: {e}")
+        return False
+
+    except Exception as e:
+        logger.error(f"Unexpected error sending Telegram message: {e}", exc_info=True)
+        return False
+
+
 def send_telegram_message(message: str, parse_mode: str = ParseMode.MARKDOWN) -> bool:
     """
     Send a message to the configured Telegram chat.
@@ -66,32 +109,8 @@ def send_telegram_message(message: str, parse_mode: str = ParseMode.MARKDOWN) ->
             "Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in .env"
         )
 
-    try:
-        bot = Bot(token=bot_token)
-        bot.send_message(
-            chat_id=chat_id,
-            text=message,
-            parse_mode=parse_mode,
-            disable_web_page_preview=False  # Show link previews
-        )
-        logger.info(f"Telegram message sent successfully to chat {chat_id}")
-        return True
-
-    except Unauthorized as e:
-        logger.critical(f"Telegram bot token is invalid or unauthorized: {e}")
-        return False
-
-    except NetworkError as e:
-        logger.error(f"Telegram network error: {e}")
-        return False
-
-    except TelegramError as e:
-        logger.error(f"Telegram API error: {e}")
-        return False
-
-    except Exception as e:
-        logger.error(f"Unexpected error sending Telegram message: {e}", exc_info=True)
-        return False
+    # Run the async function in a new event loop
+    return asyncio.run(_send_message_async(bot_token, chat_id, message, parse_mode))
 
 
 def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:

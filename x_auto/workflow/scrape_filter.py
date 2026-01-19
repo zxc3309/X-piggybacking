@@ -643,7 +643,7 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
             ws = testing_client.get_sheet(testing_ws_name)
         except Exception:
             print(f"Worksheet '{testing_ws_name}' not found, creating it...")
-            ws = testing_client.spreadsheet.add_worksheet(title=testing_ws_name, rows=1000, cols=20)
+            ws = testing_client.spreadsheet.add_worksheet(title=testing_ws_name, rows=1000, cols=25)
             print(f"Created worksheet '{testing_ws_name}'")
 
         existing = ws.get_all_values()
@@ -654,7 +654,9 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
                 "scraped_at", "profile_url", "author", "post_content", "timestamp",
                 "likes", "reposts", "replies", "bookmarks", "views",
                 "llm_decision", "llm_reason", "prompt_used",
-                "reply_recommendation", "post_link"
+                "reply_recommendation", "post_link",
+                "user_decision", "user_comment", "feedback_timestamp",
+                "feedback_source", "feedback_status", "prompt_version"
             ]
             ws.append_row(headers, value_input_option="USER_ENTERED")
             existing = ws.get_all_values()
@@ -704,11 +706,21 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
             prompt_used = item.get("prompt_used", "match_prompt")
             reply_reco = item.get("reply_reco", "")
 
+            # Feedback columns (initially empty, to be filled by user)
+            user_decision = ""  # Will be filled by user feedback (0/1)
+            user_comment = ""   # Will be filled by user feedback
+            feedback_timestamp = ""  # Will be set when user gives feedback
+            feedback_source = ""     # Will be "telegram", "sheets", or "both"
+            feedback_status = "pending"  # Default status for new posts
+            prompt_version = item.get("prompt_version", "v1.0")  # Track prompt version
+
             rows.append([
                 scraped_at, profile_url, author, text, ts_human,
                 likes, reposts, replies_count, bookmarks, views,
                 llm_decision, llm_reason, prompt_used,
-                reply_reco, post_link
+                reply_reco, post_link,
+                user_decision, user_comment, feedback_timestamp,
+                feedback_source, feedback_status, prompt_version
             ])
 
         # Write rows
@@ -903,6 +915,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 "reply_reco": recommendation,
                 "post_id": post.get("id") or post.get("postId") or "",
                 "timestamp": post.get("timestamp"),
+                "prompt_version": "v1.0",  # TODO: Read from prompt_history
             })
 
             # Add to matched lists only if LLM says yes (for output sheet)
