@@ -995,11 +995,15 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 ts_str = str(ts_raw) if ts_raw is not None else ""
                 ts_human = format_timestamp(ts_raw, created_at)
                 post_id = item.get("post_id", "")
-                post_link = (
-                    post.get("postUrl")
-                    or post.get("url")
-                    or (f"https://x.com/i/web/status/{post_id}" if post_id else "")
-                )
+                author = post.get("author", {}).get("userName", "")
+                # Build post link - use standard format for better mobile app deep linking
+                post_link = post.get("postUrl") or post.get("url")
+                if not post_link and post_id:
+                    if author:
+                        # Standard format triggers iOS/Android Universal Links for X app
+                        post_link = f"https://x.com/{author}/status/{post_id}"
+                    else:
+                        post_link = f"https://x.com/i/web/status/{post_id}"
 
                 # Extract engagement metrics and author
                 likes = post.get("likes", 0)
