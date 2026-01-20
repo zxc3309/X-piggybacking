@@ -24,6 +24,7 @@ import requests
 from dotenv import load_dotenv
 
 from x_auto.scrapers.apify_client import fetch_posts
+from x_auto.scrapers.article_detector import is_article_post
 from x_auto.sheets.client import GoogleSheetsClient
 
 
@@ -892,9 +893,21 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
             if not text:
                 continue
 
-            # Get LLM decision with reason
-            llm_result = get_llm_decision_with_reason(base_prompt, text)
-            is_match = llm_result["decision"]
+            # Check if post contains an X Article link (auto-pass if so)
+            is_article, article_url = is_article_post(post)
+            if is_article:
+                # Article posts auto-pass LLM judgment
+                is_match = True
+                llm_result = {
+                    "decision": True,
+                    "decision_text": "yes",
+                    "reason": f"Auto-pass: X Article detected ({article_url})"
+                }
+                print(f"   → Auto-pass: X Article detected ({article_url})")
+            else:
+                # Regular posts go through LLM judgment
+                llm_result = get_llm_decision_with_reason(base_prompt, text)
+                is_match = llm_result["decision"]
 
             # Generate reply recommendation, summary, and category only for matched posts
             recommendation = ""
