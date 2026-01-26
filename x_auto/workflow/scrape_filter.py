@@ -554,27 +554,60 @@ def get_prompts_from_sheet() -> Dict[str, str]:
     """
     Load prompts from a dedicated prompts sheet.
 
-    Expects columns: name, prompt (first row as header). Returns a mapping.
+    Uses horizontal layout (consistent with prompt_manager.py):
+        Row 1: Headers (prompt names like match_prompt, reply_prompt, etc.)
+        Row 2: Values (actual prompt content)
+
     Falls back to defaults if env not set or sheet unreadable.
     """
     # New env var with fallback to legacy
     prompts_sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_PROMPTS_SHEET_ID")
     if not prompts_sheet_id:
         return {}
-    worksheet_name = os.getenv("GOOGLE_WS_PROMPTS") or os.getenv("GOOGLE_X_PROMPTS_WORKSHEET", "prompts")
+    worksheet_name = os.getenv("GOOGLE_WS_PROMPTS") or os.getenv("GOOGLE_X_PROMPTS_WORKSHEET", "prompt_inuse")
     try:
         client = GoogleSheetsClient(spreadsheet_name="prompts_sheet", spreadsheet_id=prompts_sheet_id)
         ws = client.get_sheet(worksheet_name)
-        records = ws.get_all_records()
+        all_values = ws.get_all_values()
         prompt_map: Dict[str, str] = {}
-        for row in records:
-            name = str(row.get("name") or "").strip()
-            prompt_val = str(row.get("prompt") or "").strip()
-            if name and prompt_val:
-                prompt_map[name] = prompt_val
+
+        # Horizontal layout: Row 1 = headers (prompt names), Row 2 = values (prompt content)
+        if len(all_values) >= 2:
+            headers = all_values[0]
+            values = all_values[1]
+            for i, header in enumerate(headers):
+                header_name = header.strip()
+                if header_name and i < len(values):
+                    prompt_val = values[i].strip()
+                    if prompt_val:
+                        prompt_map[header_name] = prompt_val
+
         return prompt_map
     except Exception:
         return {}
+
+
+def get_active_prompt_version(sheet_client: GoogleSheetsClient, prompt_name: str = "match_prompt") -> str:
+    """
+    Get the active prompt version from prompt_history worksheet.
+
+    Args:
+        sheet_client: Authenticated GoogleSheetsClient instance.
+        prompt_name: Name of the prompt to get version for.
+
+    Returns:
+        Version ID (e.g., "v1.0") or "v1.0" as fallback.
+    """
+    try:
+        ws = sheet_client.get_sheet("prompt_history")
+        records = ws.get_all_records()
+        for record in records:
+            if (record.get("prompt_name") == prompt_name and
+                record.get("status") == "active"):
+                return record.get("version_id", "v1.0")
+    except Exception:
+        pass
+    return "v1.0"  # fallback
 
 
 def format_timestamp(ts: Any, created_at: Optional[str] = None) -> str:
@@ -779,6 +812,11 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
 
     # Build LLM prompts from the prompts sheet (or defaults).
     prompt_map = get_prompts_from_sheet()
+
+    # Get active prompt version from prompt_history
+    active_version = get_active_prompt_version(sheet_client, "match_prompt")
+    print(f"Using prompt version: {active_version}")
+
     base_prompt = prompt_map.get(
         "match_prompt",
         'You are a professional liquid fund investor, please see if this content has the similar information as the '
@@ -928,7 +966,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 "reply_reco": recommendation,
                 "post_id": post.get("id") or post.get("postId") or "",
                 "timestamp": post.get("timestamp"),
-                "prompt_version": "v1.0",  # TODO: Read from prompt_history
+                "prompt_version": active_version,
             })
 
             # Add to matched lists only if LLM says yes (for output sheet)
