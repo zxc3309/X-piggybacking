@@ -59,7 +59,7 @@ class PromptManager:
 
     def get_current_prompt_text(self, prompt_name: str = "match_prompt") -> Optional[str]:
         """
-        Get the current active prompt text from prompt_inuse worksheet.
+        Get the current active prompt text from prompt_history (single source of truth).
 
         Args:
             prompt_name: Name of prompt (default: "match_prompt")
@@ -68,22 +68,15 @@ class PromptManager:
             Prompt text or None if not found
         """
         try:
-            prompts_ws = self.sheet_client.get_sheet(self.prompts_ws_name)
-            all_values = prompts_ws.get_all_values()
+            history_ws = self.sheet_client.get_sheet(self.history_ws_name)
+            records = history_ws.get_all_records()
 
-            if len(all_values) < 2:
-                return None
+            for record in records:
+                if (record.get("prompt_name") == prompt_name and
+                    record.get("status") == "active"):
+                    return str(record.get("prompt_text") or "").strip() or None
 
-            # Horizontal layout: row 1 = headers, row 2 = values
-            headers = all_values[0]
-            values = all_values[1]
-
-            try:
-                prompt_index = headers.index(prompt_name)
-                return values[prompt_index].strip()
-            except (ValueError, IndexError):
-                return None
-
+            return None
         except Exception as e:
             print(f"Warning: Could not get current prompt text: {e}")
             return None
@@ -327,12 +320,10 @@ class PromptManager:
 
     def activate_version(self, version_id: str, prompt_name: str = "match_prompt") -> None:
         """
-        Activate a prompt version.
+        Activate a prompt version (only updates prompt_history status).
 
-        Updates:
-        1. prompt_history: Set specified version status to "active"
-        2. prompt_history: Archive previous active version
-        3. prompt_inuse: Update with new prompt text
+        Since scraper now reads directly from prompt_history, we no longer
+        need to sync to prompt_inuse worksheet.
 
         Args:
             version_id: Version to activate (e.g., "v1.1")
@@ -343,15 +334,13 @@ class PromptManager:
 
         # Find the version to activate
         activate_row = None
-        activate_prompt_text = None
         for i, record in enumerate(records, start=2):  # Start at 2 (row 1 is header)
             if (record.get("version_id") == version_id and
                 record.get("prompt_name") == prompt_name):
                 activate_row = i
-                activate_prompt_text = record.get("prompt_text")
                 break
 
-        if not activate_row or not activate_prompt_text:
+        if not activate_row:
             raise ValueError(f"Version {version_id} for {prompt_name} not found")
 
         # Step 1: Archive previous active version
@@ -361,28 +350,12 @@ class PromptManager:
                 # Set status to "archived"
                 status_col = 6  # Column F (status)
                 history_ws.update_cell(i, status_col, "archived")
-                print(f"✓ Archived previous active version: {record.get('version_id')}")
+                print(f"Archived previous active version: {record.get('version_id')}")
 
         # Step 2: Set new version to active
         status_col = 6  # Column F (status)
         history_ws.update_cell(activate_row, status_col, "active")
-        print(f"✓ Set {version_id} status to 'active'")
-
-        # Step 3: Update prompt_inuse worksheet
-        prompts_ws = self.sheet_client.get_sheet(self.prompts_ws_name)
-        all_values = prompts_ws.get_all_values()
-
-        if len(all_values) < 2:
-            raise ValueError(f"prompt_inuse worksheet is empty or malformed")
-
-        # Horizontal layout: row 1 = headers, row 2 = values
-        headers = all_values[0]
-        try:
-            prompt_col = headers.index(prompt_name) + 1  # Convert to 1-indexed
-            prompts_ws.update_cell(2, prompt_col, activate_prompt_text)
-            print(f"✓ Updated {self.prompts_ws_name} with new prompt text")
-        except ValueError:
-            raise ValueError(f"Prompt '{prompt_name}' not found in {self.prompts_ws_name}")
+        print(f"Activated {version_id} for {prompt_name}")
 
     def compare_versions(
         self,

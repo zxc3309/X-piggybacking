@@ -552,35 +552,31 @@ def get_content_provided() -> str:
 
 def get_prompts_from_sheet() -> Dict[str, str]:
     """
-    Load prompts from a dedicated prompts sheet.
+    Load prompts from prompt_history worksheet (single source of truth).
 
-    Uses horizontal layout (consistent with prompt_manager.py):
-        Row 1: Headers (prompt names like match_prompt, reply_prompt, etc.)
-        Row 2: Values (actual prompt content)
+    Reads all records with status="active" and returns a mapping of
+    prompt_name to prompt_text.
 
-    Falls back to defaults if env not set or sheet unreadable.
+    Returns:
+        Dict mapping prompt names to their text content.
+        e.g., {"match_prompt": "You are...", "reply_prompt": "..."}
     """
-    # New env var with fallback to legacy
     prompts_sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_PROMPTS_SHEET_ID")
     if not prompts_sheet_id:
         return {}
-    worksheet_name = os.getenv("GOOGLE_WS_PROMPTS") or os.getenv("GOOGLE_X_PROMPTS_WORKSHEET", "prompt_inuse")
+
     try:
         client = GoogleSheetsClient(spreadsheet_name="prompts_sheet", spreadsheet_id=prompts_sheet_id)
-        ws = client.get_sheet(worksheet_name)
-        all_values = ws.get_all_values()
-        prompt_map: Dict[str, str] = {}
+        ws = client.get_sheet("prompt_history")
+        records = ws.get_all_records()
 
-        # Horizontal layout: Row 1 = headers (prompt names), Row 2 = values (prompt content)
-        if len(all_values) >= 2:
-            headers = all_values[0]
-            values = all_values[1]
-            for i, header in enumerate(headers):
-                header_name = header.strip()
-                if header_name and i < len(values):
-                    prompt_val = values[i].strip()
-                    if prompt_val:
-                        prompt_map[header_name] = prompt_val
+        prompt_map: Dict[str, str] = {}
+        for record in records:
+            if record.get("status") == "active":
+                name = str(record.get("prompt_name") or "").strip()
+                text = str(record.get("prompt_text") or "").strip()
+                if name and text:
+                    prompt_map[name] = text
 
         return prompt_map
     except Exception:

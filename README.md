@@ -14,47 +14,65 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 - **Scheduled execution** - Run on Railway, cron, or GitHub Actions
 
 ## Setup
-1) Create a Python 3.11+ virtual environment
-2) Install dependencies: `pip install -r requirements.txt`
-3) Copy `.env.example` to `.env` and fill in credentials
-4) Share your Google Sheet with the service account email (from JSON credentials)
-5) Configure required env vars: `APIFY_TOKEN`, `OPENAI_API_KEY`, `GOOGLE_SHEET_ID`
-6) **(Optional) Telegram notifications**:
-   - Create bot via [@BotFather](https://t.me/botfather), get token
-   - Get chat ID from [@userinfobot](https://t.me/userinfobot)
-   - Add to `.env`: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `ENABLE_TELEGRAM_NOTIFICATIONS=true`
-7) Run: `python main.py`
 
-## Google Sheets Structure
+### Requirements
+- Python 3.10+
+- Virtual environment recommended
 
-**Single unified sheet** with these worksheets:
-- `profiles` (or `Researcher`) - Input: X handles to monitor
-- `prompts` (or `prompt_inuse`) - Input: LLM prompts for filtering/replies/categorization
-- `all_post` - Output: All scraped posts with llm_decision (0/1), reasons, engagement metrics
-- `scraped_output` - Output: Matched posts (llm_decision=1) with reply recommendations, summaries, categories
+### Credentials Needed
+| Service | Env Variable | How to Get |
+|---------|--------------|------------|
+| Apify | `APIFY_TOKEN` | [console.apify.com](https://console.apify.com/) > Settings > Integrations |
+| Google | `GOOGLE_SERVICE_ACCOUNT_PATH` | [Google Cloud Console](https://console.cloud.google.com/) > Service Account > JSON key |
+| OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/) > API keys |
+| X API | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | [developer.twitter.com](https://developer.twitter.com/) (only needed for posting) |
+| Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | [@BotFather](https://t.me/botfather) for token, [@userinfobot](https://t.me/userinfobot) for chat ID |
 
-## Telegram Notifications
-
-The system can send daily summaries of scraped posts to Telegram, organized by category with emoji indicators.
-
-**Quick Start:**
+### Quick Start
 ```bash
-# Test the notification system
-python test_telegram_notification.py
+# 1. Install dependencies
+pip install -r requirements.txt
 
-# Run scraping with automatic notifications
-ENABLE_TELEGRAM_NOTIFICATIONS=true python scrape_and_store.py
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your credentials
+
+# 3. Share Google Sheets with service account email (from JSON file)
+
+# 4. Run
+python main.py
 ```
 
-**Features:**
-- Posts grouped by category (Token Analysis 📊, Industry Analysis 🏭, Market Comment 💬, etc.)
-- Direct links to X posts
-- Handles long messages by splitting into multiple parts
-- Graceful handling of errors and edge cases
+## Usage
 
-**Requirements:**
-- Posts must have `summary` and `category` fields to appear in notifications
-- Set `ENABLE_TELEGRAM_NOTIFICATIONS=true` in `.env` to enable
+```bash
+# Run main workflow (scrape + filter + notify)
+python main.py
+
+# Scrape and store posts only
+python scrape_and_store.py
+
+# Update LLM prompts from Google Sheets
+python scripts/update_prompt.py
+```
+
+## Architecture
+
+```
+Google Sheets (profiles)
+        │
+        ▼
+   Apify Scraper ──────► Raw Posts
+        │
+        ▼
+   LLM Filter (OpenAI) ──► Scored Posts
+        │
+        ▼
+   Categorizer ──────────► Categorized Posts
+        │
+        ├──► Google Sheets (logs)
+        └──► Telegram (daily summary)
+```
 
 ## Structure
 - `x_auto/config` - Environment loading and credential helpers
@@ -66,7 +84,84 @@ ENABLE_TELEGRAM_NOTIFICATIONS=true python scrape_and_store.py
 - `x_auto/notifications` - Telegram bot integration for daily summaries
 - `x_auto/workflow` - End-to-end pipeline orchestration (scraping, filtering, LLM evaluation)
 - `x_auto/utils` - Shared helpers (logging, rate limiting, ID tracking)
-- `docs/architecture.md` - High-level flow description
+- `scripts/` - Utility scripts for prompt updates and maintenance
+
+## Google Sheets Structure
+
+**Single unified sheet** with these worksheets:
+- `profiles` (or `Researcher`) - Input: X handles to monitor
+- `prompts` (or `prompt_inuse`) - Input: LLM prompts for filtering/replies/categorization
+- `all_post` - Output: All scraped posts with llm_decision (0/1), reasons, engagement metrics
+- `scraped_output` - Output: Matched posts (llm_decision=1) with reply recommendations, summaries, categories
+
+## Telegram Notifications
+
+Posts grouped by category (Token Analysis, Industry Analysis, Market Comment, etc.) with direct links to X posts.
+
+**Enable:** Set `ENABLE_TELEGRAM_NOTIFICATIONS=true` in `.env`
+
+## Prompt Iteration Guide
+
+The system uses `prompt_history` as the **single source of truth** for all prompts. The scraper reads directly from `prompt_history` where `status="active"`, eliminating sync issues.
+
+### View Current Prompt
+```bash
+python scripts/update_prompt.py --show-current
+```
+
+### Update Prompt Workflow
+1. Run the interactive update tool:
+   ```bash
+   python scripts/update_prompt.py match_prompt
+   ```
+
+2. The tool displays:
+   - Current prompt content
+   - Recent accuracy metrics
+   - False positive/negative examples
+
+3. After editing, the tool automatically:
+   - Creates a new version (status: testing)
+   - Tests on historical data
+   - Shows comparison results
+
+4. Choose whether to activate the new version
+
+### Manual Version Activation
+```bash
+python scripts/update_prompt.py --activate v1.2
+```
+
+### Compare Versions
+```bash
+python scripts/update_prompt.py --compare v1.0 v1.1
+```
+
+### Analyze Feedback
+```bash
+# See accuracy, FP/FN rates
+python scripts/analyze_feedback.py
+
+# Show only false positives (LLM accepted, you rejected)
+python scripts/analyze_feedback.py --fp
+
+# Show only false negatives (LLM rejected, you accepted)
+python scripts/analyze_feedback.py --fn
+```
+
+### Prompt Types
+- `match_prompt` - Determines if a post is relevant
+- `reply_prompt` - Generates reply suggestions
+- `summary_prompt` - Generates summaries
+- `category_prompt` - Categorizes posts
+
+### Prompt History Structure
+Each `prompt_name` has independent version management in `prompt_history`:
+- `version_id` - Version identifier (e.g., v1.0, v1.1)
+- `status` - One of: `active`, `testing`, `archived`
+- `accuracy`, `false_positive_rate`, `false_negative_rate` - Performance metrics
+
+Only one version per `prompt_name` can have `status="active"` at a time.
 
 ## Next Steps
 - Review and adjust LLM prompts in the `prompts` worksheet for optimal filtering
