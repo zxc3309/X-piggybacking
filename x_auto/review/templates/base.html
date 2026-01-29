@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Reply Review{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #0f1419;
+            --surface: #16202a;
+            --surface-hover: #1c2b3a;
+            --border: #2f3336;
+            --text: #e7e9ea;
+            --text-secondary: #71767b;
+            --accent: #1d9bf0;
+            --accent-hover: #1a8cd8;
+            --green: #00ba7c;
+            --green-hover: #00a06a;
+            --red: #f4212e;
+            --red-hover: #dc1d29;
+            --yellow: #ffd400;
+            --orange: #ff7a00;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            background: rgba(15, 20, 25, 0.85);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 12px 0;
+        }
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .header h1 a {
+            color: var(--text);
+            text-decoration: none;
+        }
+        .quota-badge {
+            font-size: 13px;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-weight: 600;
+        }
+        .quota-ok { background: rgba(0, 186, 124, 0.15); color: var(--green); }
+        .quota-warn { background: rgba(255, 122, 0, 0.15); color: var(--orange); }
+        .quota-full { background: rgba(244, 33, 46, 0.15); color: var(--red); }
+
+        /* Filter tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+        .tab:hover { background: var(--surface-hover); color: var(--text); }
+        .tab.active { background: var(--text); color: var(--bg); }
+        .tab-count {
+            font-size: 12px;
+            margin-left: 4px;
+            opacity: 0.7;
+        }
+
+        /* Cards */
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            background: var(--surface);
+            transition: border-color 0.15s;
+        }
+        .card:hover { border-color: var(--text-secondary); }
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .card-author {
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .card-author a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .card-author a:hover { text-decoration: underline; }
+        .card-time {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .card-status {
+            font-size: 12px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .status-pending { background: rgba(255, 212, 0, 0.15); color: var(--yellow); }
+        .status-approved { background: rgba(29, 155, 240, 0.15); color: var(--accent); }
+        .status-sent { background: rgba(0, 186, 124, 0.15); color: var(--green); }
+        .status-rejected { background: rgba(244, 33, 46, 0.12); color: var(--red); }
+        .status-failed { background: rgba(244, 33, 46, 0.15); color: var(--red); }
+
+        /* Post content */
+        .post-content {
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 8px 0;
+            color: var(--text);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .post-content.truncated {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Reply preview */
+        .reply-preview {
+            background: rgba(29, 155, 240, 0.08);
+            border-left: 3px solid var(--accent);
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .reply-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s, opacity 0.15s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-approve { background: var(--green); color: #fff; }
+        .btn-approve:hover { background: var(--green-hover); }
+        .btn-reject { background: transparent; color: var(--red); border: 1px solid var(--red); }
+        .btn-reject:hover { background: rgba(244, 33, 46, 0.1); }
+        .btn-save { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+        .btn-save:hover { background: rgba(29, 155, 240, 0.1); }
+        .btn-detail { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .btn-detail:hover { background: var(--surface-hover); color: var(--text); }
+        .btn-back { background: transparent; color: var(--text); border: none; padding: 8px 0; }
+        .btn-back:hover { color: var(--accent); }
+        .btn-sm { padding: 4px 12px; font-size: 13px; }
+        .btn-link { background: transparent; color: var(--accent); border: 1px solid var(--border); }
+        .btn-link:hover { background: rgba(29, 155, 240, 0.1); }
+
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        /* Textarea */
+        .edit-area {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 15px;
+            font-family: inherit;
+            line-height: 1.5;
+            resize: vertical;
+        }
+        .edit-area:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .char-counter {
+            font-size: 13px;
+            text-align: right;
+            margin-top: 4px;
+            color: var(--text-secondary);
+        }
+        .char-counter.over { color: var(--red); font-weight: 700; }
+        .char-counter.warn { color: var(--orange); }
+
+        /* Detail page sections */
+        .section {
+            margin: 20px 0;
+        }
+        .section-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .original-post {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .error-msg {
+            background: rgba(244, 33, 46, 0.1);
+            border: 1px solid rgba(244, 33, 46, 0.3);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: var(--red);
+            margin: 10px 0;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-state-icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state h2 { font-size: 20px; color: var(--text); margin-bottom: 4px; }
+        .empty-state p { font-size: 15px; }
+
+        /* Copy button */
+        .copy-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .copy-btn:hover { background: var(--surface-hover); color: var(--text); }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card-actions { flex-direction: column; }
+            .btn { justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container header-inner">
+            <h1><a href="/review">Reply Review</a></h1>
+            {% block header_right %}{% endblock %}
+        </div>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

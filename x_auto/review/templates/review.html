@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Review — @{{ item.author }} — Reply Review{% endblock %}
+
+{% block header_right %}
+{% set ratio = stats.daily_sent / stats.daily_limit if stats.daily_limit > 0 else 0 %}
+<span class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
+    Today: {{ stats.daily_sent }}/{{ stats.daily_limit }}
+</span>
+{% endblock %}
+
+{% block content %}
+<div style="padding: 16px 0;">
+    <a class="btn btn-back" href="/review?status=pending">← Back to queue</a>
+</div>
+
+<!-- Status -->
+<div style="margin-bottom: 16px;">
+    <span class="card-status status-{{ item.status }}" style="font-size: 14px; padding: 4px 14px;">
+        {{ item.status }}
+    </span>
+    {% if item.error_message %}
+    <div class="error-msg" style="margin-top: 10px;">{{ item.error_message }}</div>
+    {% endif %}
+</div>
+
+<!-- Original post -->
+<div class="section">
+    <div class="section-label">Original Post</div>
+    <div class="original-post">
+        <div class="card-header">
+            <span class="card-author">
+                {% if item.author %}
+                    <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                {% else %}
+                    Unknown author
+                {% endif %}
+            </span>
+            {% if item.post_link %}
+            <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
+            {% endif %}
+        </div>
+        <div class="post-content">{{ item.post_content }}</div>
+    </div>
+</div>
+
+<!-- AI generated reply -->
+<div class="section">
+    <div class="section-label" style="display: flex; align-items: center; justify-content: space-between;">
+        AI Suggested Reply
+        <button class="copy-btn" onclick="copyToEditor()">Copy to editor ↓</button>
+    </div>
+    <div class="reply-preview" id="ai-reply">
+        {{ item.original_reply }}
+    </div>
+    <div class="char-counter">
+        {{ item.original_reply | length }} / 280 characters
+    </div>
+</div>
+
+<!-- Editable reply -->
+<form id="review-form" method="post" action="/review/{{ item.queue_id }}/approve">
+    <div class="section">
+        <div class="section-label">Your Reply (editable)</div>
+        <textarea
+            class="edit-area"
+            id="edited-reply"
+            name="edited_reply"
+            placeholder="Edit the reply here, or leave empty to use AI suggestion..."
+            maxlength="500"
+        >{{ item.edited_reply }}</textarea>
+        <div class="char-counter" id="char-counter">
+            <span id="char-count">{{ item.edited_reply | length }}</span> / 280 characters
+        </div>
+    </div>
+
+    <div class="card-actions" style="margin: 24px 0; justify-content: space-between;">
+        <div>
+            <form method="post" action="/review/{{ item.queue_id }}/reject" style="display: inline;">
+                <button type="submit" class="btn btn-reject" formaction="/review/{{ item.queue_id }}/reject">Reject</button>
+            </form>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="submit" class="btn btn-save" formaction="/review/{{ item.queue_id }}/save">Save Draft</button>
+            <button type="submit" class="btn btn-approve">Approve & Send</button>
+        </div>
+    </div>
+</form>
+
+<!-- Timestamps -->
+<div class="section" style="padding-bottom: 32px;">
+    <div class="section-label">Audit Trail</div>
+    <div style="font-size: 13px; color: var(--text-secondary); line-height: 2;">
+        <div>Created: {{ item.created_at or "—" }}</div>
+        <div>Approved: {{ item.approved_at or "—" }}</div>
+        <div>Sent: {{ item.sent_at or "—" }}</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const textarea = document.getElementById('edited-reply');
+    const counter = document.getElementById('char-count');
+    const counterDiv = document.getElementById('char-counter');
+    const MAX_CHARS = 280;
+
+    function updateCounter() {
+        const len = textarea.value.length;
+        counter.textContent = len;
+        counterDiv.classList.remove('over', 'warn');
+        if (len > MAX_CHARS) {
+            counterDiv.classList.add('over');
+        } else if (len > MAX_CHARS * 0.9) {
+            counterDiv.classList.add('warn');
+        }
+    }
+
+    textarea.addEventListener('input', updateCounter);
+
+    // If textarea is empty, count the AI reply length instead
+    if (!textarea.value.trim()) {
+        const aiReplyLen = document.getElementById('ai-reply').textContent.trim().length;
+        counter.textContent = '0';
+    }
+
+    function copyToEditor() {
+        const aiText = document.getElementById('ai-reply').textContent.trim();
+        textarea.value = aiText;
+        updateCounter();
+        textarea.focus();
+    }
+
+    // Warn before approving over-limit replies
+    document.getElementById('review-form').addEventListener('submit', function(e) {
+        const btn = e.submitter;
+        if (btn && btn.classList.contains('btn-approve')) {
+            const text = textarea.value.trim();
+            // If textarea is empty, the original AI reply will be used
+            const aiText = document.getElementById('ai-reply').textContent.trim();
+            const replyText = text || aiText;
+            if (replyText.length > MAX_CHARS) {
+                e.preventDefault();
+                alert('Reply exceeds 280 characters (' + replyText.length + '). Please shorten it.');
+            }
+        }
+    });
+
+    updateCounter();
+</script>
+{% endblock %}
