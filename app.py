@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from scheduler import XScraperScheduler, execute_scrape_job_sync
+from x_auto.review.app import app as review_app
 
 # Configure logging
 logging.basicConfig(
@@ -69,6 +70,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+
+# Mount the review dashboard under /dashboard
+app.mount("/dashboard", review_app)
 
 
 @app.get("/")

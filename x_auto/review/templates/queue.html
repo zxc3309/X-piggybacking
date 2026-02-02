@@ -11,22 +11,22 @@
 {% block content %}
 <!-- Filter tabs -->
 <nav class="tabs">
-    <a class="tab {% if not current_filter %}active{% endif %}" href="/review">
+    <a class="tab {% if not current_filter %}active{% endif %}" href="{{ prefix }}/review">
         All<span class="tab-count">{{ stats.total }}</span>
     </a>
-    <a class="tab {% if current_filter == 'pending' %}active{% endif %}" href="/review?status=pending">
+    <a class="tab {% if current_filter == 'pending' %}active{% endif %}" href="{{ prefix }}/review?status=pending">
         Pending<span class="tab-count">{{ stats.pending }}</span>
     </a>
-    <a class="tab {% if current_filter == 'approved' %}active{% endif %}" href="/review?status=approved">
+    <a class="tab {% if current_filter == 'approved' %}active{% endif %}" href="{{ prefix }}/review?status=approved">
         Approved<span class="tab-count">{{ stats.approved }}</span>
     </a>
-    <a class="tab {% if current_filter == 'sent' %}active{% endif %}" href="/review?status=sent">
+    <a class="tab {% if current_filter == 'sent' %}active{% endif %}" href="{{ prefix }}/review?status=sent">
         Sent<span class="tab-count">{{ stats.sent }}</span>
     </a>
-    <a class="tab {% if current_filter == 'rejected' %}active{% endif %}" href="/review?status=rejected">
+    <a class="tab {% if current_filter == 'rejected' %}active{% endif %}" href="{{ prefix }}/review?status=rejected">
         Rejected<span class="tab-count">{{ stats.rejected }}</span>
     </a>
-    <a class="tab {% if current_filter == 'failed' %}active{% endif %}" href="/review?status=failed">
+    <a class="tab {% if current_filter == 'failed' %}active{% endif %}" href="{{ prefix }}/review?status=failed">
         Failed<span class="tab-count">{{ stats.failed }}</span>
     </a>
 </nav>
@@ -62,18 +62,18 @@
         {% endif %}
 
         <div class="card-actions">
-            <a class="btn btn-detail btn-sm" href="/review/{{ item.queue_id }}">Details</a>
+            <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Details</a>
             {% if item.status == 'pending' %}
-            <form method="post" action="/review/{{ item.queue_id }}/approve" style="display:inline;">
+            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve" style="display:inline;">
                 <input type="hidden" name="edited_reply" value="">
                 <button type="submit" class="btn btn-approve btn-sm">Approve</button>
             </form>
-            <form method="post" action="/review/{{ item.queue_id }}/reject" style="display:inline;">
+            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/reject" style="display:inline;">
                 <button type="submit" class="btn btn-reject btn-sm">Reject</button>
             </form>
             {% endif %}
             {% if item.status == 'failed' %}
-            <form method="post" action="/review/{{ item.queue_id }}/approve" style="display:inline;">
+            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve" style="display:inline;">
                 <input type="hidden" name="edited_reply" value="">
                 <button type="submit" class="btn btn-approve btn-sm">Retry</button>
             </form>

@@ -10,7 +10,7 @@
 
 {% block content %}
 <div style="padding: 16px 0;">
-    <a class="btn btn-back" href="/review?status=pending">← Back to queue</a>
+    <a class="btn btn-back" href="{{ prefix }}/review?status=pending">← Back to queue</a>
 </div>
 
 <!-- Status -->
@@ -58,7 +58,7 @@
 </div>
 
 <!-- Editable reply -->
-<form id="review-form" method="post" action="/review/{{ item.queue_id }}/approve">
+<form id="review-form" method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve">
     <div class="section">
         <div class="section-label">Your Reply (editable)</div>
         <textarea
@@ -75,12 +75,12 @@
 
     <div class="card-actions" style="margin: 24px 0; justify-content: space-between;">
         <div>
-            <form method="post" action="/review/{{ item.queue_id }}/reject" style="display: inline;">
-                <button type="submit" class="btn btn-reject" formaction="/review/{{ item.queue_id }}/reject">Reject</button>
+            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/reject" style="display: inline;">
+                <button type="submit" class="btn btn-reject" formaction="{{ prefix }}/review/{{ item.queue_id }}/reject">Reject</button>
             </form>
         </div>
         <div style="display: flex; gap: 8px;">
-            <button type="submit" class="btn btn-save" formaction="/review/{{ item.queue_id }}/save">Save Draft</button>
+            <button type="submit" class="btn btn-save" formaction="{{ prefix }}/review/{{ item.queue_id }}/save">Save Draft</button>
             <button type="submit" class="btn btn-approve">Approve & Send</button>
         </div>
     </div>

@@ -33,6 +33,11 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
+def _prefix(request: Request) -> str:
+    """Return the mount prefix (e.g. '/dashboard') so redirects work correctly."""
+    return request.scope.get("root_path", "")
+
+
 # ---------------------------------------------------------------------------
 # Pages
 # ---------------------------------------------------------------------------
@@ -40,7 +45,7 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Redirect root to the review queue."""
-    return RedirectResponse(url="/review", status_code=302)
+    return RedirectResponse(url=f"{_prefix(request)}/review", status_code=302)
 
 
 @app.get("/review", response_class=HTMLResponse)
@@ -65,6 +70,7 @@ async def review_queue(request: Request, status: Optional[str] = None):
         "items": items,
         "stats": stats,
         "current_filter": status,
+        "prefix": _prefix(request),
     })
 
 
@@ -90,6 +96,7 @@ async def review_detail(request: Request, queue_id: str):
         "item": item,
         "stats": stats,
         "char_count": char_count,
+        "prefix": _prefix(request),
     })
 
 
@@ -98,7 +105,7 @@ async def review_detail(request: Request, queue_id: str):
 # ---------------------------------------------------------------------------
 
 @app.post("/review/{queue_id}/approve")
-async def approve(queue_id: str, edited_reply: str = Form("")):
+async def approve(request: Request, queue_id: str, edited_reply: str = Form("")):
     """Approve a reply, optionally with edited text."""
     # Validate character count
     reply_text = edited_reply.strip()
@@ -114,11 +121,11 @@ async def approve(queue_id: str, edited_reply: str = Form("")):
     if not success:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    return RedirectResponse(url="/review?status=pending", status_code=303)
+    return RedirectResponse(url=f"{_prefix(request)}/review?status=pending", status_code=303)
 
 
 @app.post("/review/{queue_id}/reject")
-async def reject(queue_id: str):
+async def reject(request: Request, queue_id: str):
     """Reject a reply."""
     try:
         success = queue_manager.reject_item(queue_id)
@@ -129,11 +136,11 @@ async def reject(queue_id: str):
     if not success:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    return RedirectResponse(url="/review?status=pending", status_code=303)
+    return RedirectResponse(url=f"{_prefix(request)}/review?status=pending", status_code=303)
 
 
 @app.post("/review/{queue_id}/save")
-async def save_edit(queue_id: str, edited_reply: str = Form("")):
+async def save_edit(request: Request, queue_id: str, edited_reply: str = Form("")):
     """Save edits without approving."""
     try:
         success = queue_manager.update_item(queue_id, {"edited_reply": edited_reply.strip()})
@@ -144,7 +151,7 @@ async def save_edit(queue_id: str, edited_reply: str = Form("")):
     if not success:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    return RedirectResponse(url=f"/review/{queue_id}", status_code=303)
+    return RedirectResponse(url=f"{_prefix(request)}/review/{queue_id}", status_code=303)
 
 
 # ---------------------------------------------------------------------------
