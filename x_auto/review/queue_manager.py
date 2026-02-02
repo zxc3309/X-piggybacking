@@ -1,0 +1,271 @@
+"""
+Manages the reply_queue Google Sheets worksheet for the review workflow.
+
+The reply_queue tracks AI-generated replies through their lifecycle:
+pending → approved → sent  (happy path)
+pending → rejected          (human rejects)
+approved → failed           (X API error)
+
+Each row represents one reply candidate with its review status,
+original/edited text, and audit timestamps.
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import uuid
+import logging
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from x_auto.sheets.client import GoogleSheetsClient
+
+logger = logging.getLogger(__name__)
+
+REPLY_QUEUE_HEADERS = [
+    "queue_id",
+    "post_id",
+    "post_link",
+    "author",
+    "post_content",
+    "original_reply",
+    "edited_reply",
+    "status",
+    "created_at",
+    "approved_at",
+    "sent_at",
+    "error_message",
+]
+
+VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed"}
+
+
+def _get_ws_name() -> str:
+    return os.getenv("GOOGLE_WS_REPLY_QUEUE", "reply_queue")
+
+
+def _get_client() -> GoogleSheetsClient:
+    sheet_id = os.getenv("GOOGLE_SHEET_ID")
+    return GoogleSheetsClient(spreadsheet_name="reply_queue", spreadsheet_id=sheet_id)
+
+
+def _ensure_worksheet(client: GoogleSheetsClient, ws_name: str):
+    """Get or create the reply_queue worksheet with headers."""
+    try:
+        ws = client.get_sheet(ws_name)
+    except RuntimeError:
+        logger.info(f"Worksheet '{ws_name}' not found, creating it...")
+        ws = client.spreadsheet.add_worksheet(title=ws_name, rows=1000, cols=len(REPLY_QUEUE_HEADERS))
+        ws.append_row(REPLY_QUEUE_HEADERS, value_input_option="USER_ENTERED")
+        logger.info(f"Created worksheet '{ws_name}' with headers")
+        return ws
+
+    # Ensure headers exist
+    existing = ws.get_all_values()
+    if not existing or not any(cell for cell in existing[0]):
+        ws.append_row(REPLY_QUEUE_HEADERS, value_input_option="USER_ENTERED")
+
+    return ws
+
+
+def extract_post_id(post_link: str) -> str:
+    """Extract the numeric post ID from an X post URL.
+
+    Handles formats:
+        https://x.com/user/status/123456
+        https://twitter.com/user/status/123456
+        https://x.com/i/web/status/123456
+    """
+    match = re.search(r"/status/(\d+)", post_link or "")
+    return match.group(1) if match else ""
+
+
+def add_to_queue(items: List[Dict[str, Any]]) -> int:
+    """Add matched posts with reply recommendations to the review queue.
+
+    Args:
+        items: List of dicts with keys: post_link, author, post_content,
+               reply_recommendation, post_id (optional).
+
+    Returns:
+        Number of items added (excluding duplicates).
+    """
+    if not items:
+        return 0
+
+    ws_name = _get_ws_name()
+    client = _get_client()
+    ws = _ensure_worksheet(client, ws_name)
+
+    # Build dedup set from existing post_links (column index 2 = post_link)
+    existing = ws.get_all_values()
+    existing_links = set()
+    for row in existing[1:]:
+        if len(row) >= 3:
+            existing_links.add(row[2].strip())
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    rows = []
+    for item in items:
+        post_link = (item.get("post_link") or "").strip()
+        if post_link in existing_links:
+            continue
+
+        queue_id = uuid.uuid4().hex[:12]
+        post_id = item.get("post_id") or extract_post_id(post_link)
+        rows.append([
+            queue_id,
+            str(post_id),
+            post_link,
+            item.get("author", ""),
+            item.get("post_content", ""),
+            item.get("reply_recommendation", ""),
+            "",           # edited_reply
+            "pending",    # status
+            now,          # created_at
+            "",           # approved_at
+            "",           # sent_at
+            "",           # error_message
+        ])
+
+    if rows:
+        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        logger.info(f"Added {len(rows)} items to reply_queue")
+
+    return len(rows)
+
+
+def get_all_items() -> List[Dict[str, Any]]:
+    """Return all items in the reply queue as dicts."""
+    ws_name = _get_ws_name()
+    client = _get_client()
+    ws = _ensure_worksheet(client, ws_name)
+
+    rows = ws.get_all_values()
+    if len(rows) <= 1:
+        return []
+
+    headers = rows[0]
+    items = []
+    for row_idx, row in enumerate(rows[1:], start=2):
+        item = {}
+        for col_idx, header in enumerate(headers):
+            item[header] = row[col_idx] if col_idx < len(row) else ""
+        item["_row_index"] = row_idx  # 1-based gspread row number
+        items.append(item)
+    return items
+
+
+def get_items_by_status(status: str) -> List[Dict[str, Any]]:
+    """Return items filtered by status."""
+    return [item for item in get_all_items() if item.get("status") == status]
+
+
+def get_item_by_id(queue_id: str) -> Optional[Dict[str, Any]]:
+    """Return a single item by queue_id."""
+    for item in get_all_items():
+        if item.get("queue_id") == queue_id:
+            return item
+    return None
+
+
+def _find_column_index(headers: List[str], col_name: str) -> int:
+    """Return 1-based column index for a given header name."""
+    try:
+        return headers.index(col_name) + 1
+    except ValueError:
+        raise RuntimeError(f"Column '{col_name}' not found in reply_queue headers")
+
+
+def update_item(queue_id: str, updates: Dict[str, str]) -> bool:
+    """Update specific fields of a queue item by queue_id.
+
+    Args:
+        queue_id: The unique queue ID.
+        updates: Dict of {column_name: new_value} to update.
+
+    Returns:
+        True if the item was found and updated.
+    """
+    ws_name = _get_ws_name()
+    client = _get_client()
+    ws = _ensure_worksheet(client, ws_name)
+
+    rows = ws.get_all_values()
+    if len(rows) <= 1:
+        return False
+
+    headers = rows[0]
+    queue_id_col = _find_column_index(headers, "queue_id")
+
+    for row_idx, row in enumerate(rows[1:], start=2):
+        cell_val = row[queue_id_col - 1] if (queue_id_col - 1) < len(row) else ""
+        if cell_val == queue_id:
+            cells_to_update = []
+            for col_name, value in updates.items():
+                col_idx = _find_column_index(headers, col_name)
+                cells_to_update.append(
+                    gspread_cell(row_idx, col_idx, value)
+                )
+            if cells_to_update:
+                ws.update_cells(cells_to_update, value_input_option="USER_ENTERED")
+            return True
+    return False
+
+
+def gspread_cell(row: int, col: int, value: str):
+    """Create a gspread Cell object for batch updates."""
+    import gspread
+    cell = gspread.Cell(row=row, col=col, value=value)
+    return cell
+
+
+def approve_item(queue_id: str, edited_reply: str = "") -> bool:
+    """Mark an item as approved, optionally with an edited reply."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    updates = {"status": "approved", "approved_at": now}
+    if edited_reply:
+        updates["edited_reply"] = edited_reply
+    return update_item(queue_id, updates)
+
+
+def reject_item(queue_id: str) -> bool:
+    """Mark an item as rejected."""
+    return update_item(queue_id, {"status": "rejected"})
+
+
+def mark_sent(queue_id: str) -> bool:
+    """Mark an item as sent after successful X API post."""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    return update_item(queue_id, {"status": "sent", "sent_at": now})
+
+
+def mark_failed(queue_id: str, error_message: str) -> bool:
+    """Mark an item as failed with error details."""
+    return update_item(queue_id, {"status": "failed", "error_message": error_message})
+
+
+def get_daily_sent_count() -> int:
+    """Count how many replies were sent today (UTC)."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    items = get_all_items()
+    count = 0
+    for item in items:
+        if item.get("status") == "sent" and item.get("sent_at", "").startswith(today):
+            count += 1
+    return count
+
+
+def get_stats() -> Dict[str, int]:
+    """Return counts by status and daily sent count."""
+    items = get_all_items()
+    stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0, "total": len(items)}
+    for item in items:
+        s = item.get("status", "")
+        if s in stats:
+            stats[s] += 1
+
+    stats["daily_sent"] = get_daily_sent_count()
+    stats["daily_limit"] = int(os.getenv("X_DAILY_REPLY_LIMIT", "17"))
+    return stats

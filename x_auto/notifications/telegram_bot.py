@@ -203,6 +203,15 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
 
         message_parts.append("")  # Blank line between categories
 
+    # Add review dashboard link if configured
+    dashboard_url = os.getenv("REVIEW_DASHBOARD_URL", "")
+    if dashboard_url:
+        pending_count = len(posts)
+        message_parts.append(
+            f"📝 [{pending_count} replies pending review]({dashboard_url}/review?status=pending)"
+        )
+        message_parts.append("")
+
     # Add footer
     message_parts.append("\\-\\-\\-")
     message_parts.append("_Powered by X\\-Piggybacking Analyzer_")

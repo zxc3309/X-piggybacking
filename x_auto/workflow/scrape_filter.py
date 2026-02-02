@@ -1071,6 +1071,41 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to write scrape output: {exc}")
 
+    # Add matched posts with reply recommendations to the review queue
+    if matched_with_profile:
+        try:
+            from x_auto.review.queue_manager import add_to_queue
+
+            queue_items = []
+            for item in matched_with_profile:
+                post = item["post"]
+                text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
+                author = post.get("author", {}).get("userName", "")
+                post_id = item.get("post_id", "")
+                post_link = post.get("postUrl") or post.get("url") or ""
+                if not post_link and post_id:
+                    if author:
+                        post_link = f"https://x.com/{author}/status/{post_id}"
+                    else:
+                        post_link = f"https://x.com/i/web/status/{post_id}"
+
+                reply_reco = item.get("reply_reco", "")
+                if reply_reco:
+                    queue_items.append({
+                        "post_link": post_link,
+                        "author": author,
+                        "post_content": text,
+                        "reply_recommendation": reply_reco,
+                        "post_id": post_id,
+                    })
+
+            if queue_items:
+                added = add_to_queue(queue_items)
+                print(f"[Reply Queue] Added {added} items to review queue")
+        except Exception as exc:
+            print(f"[Reply Queue] Failed to add items: {exc}")
+            # Don't fail the entire job if reply queue fails
+
     # Send Telegram notification with categorized summaries
     if os.getenv("ENABLE_TELEGRAM_NOTIFICATIONS", "true").lower() == "true":
         try:
