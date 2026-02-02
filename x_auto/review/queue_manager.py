@@ -16,6 +16,7 @@ import os
 import re
 import uuid
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -39,6 +40,10 @@ REPLY_QUEUE_HEADERS = [
 ]
 
 VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed"}
+
+# Simple in-memory cache to avoid repeated Google Sheets API calls
+_cache: Dict[str, Any] = {"items": None, "timestamp": 0.0}
+_CACHE_TTL = 10  # seconds
 
 
 def _get_ws_name() -> str:
@@ -132,18 +137,31 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
     if rows:
         ws.append_rows(rows, value_input_option="USER_ENTERED")
         logger.info(f"Added {len(rows)} items to reply_queue")
+        _invalidate_cache()
 
     return len(rows)
 
 
+def _invalidate_cache():
+    """Clear the cache so the next read fetches fresh data."""
+    _cache["items"] = None
+    _cache["timestamp"] = 0.0
+
+
 def get_all_items() -> List[Dict[str, Any]]:
-    """Return all items in the reply queue as dicts."""
+    """Return all items in the reply queue as dicts (cached for 10s)."""
+    now = time.monotonic()
+    if _cache["items"] is not None and (now - _cache["timestamp"]) < _CACHE_TTL:
+        return _cache["items"]
+
     ws_name = _get_ws_name()
     client = _get_client()
     ws = _ensure_worksheet(client, ws_name)
 
     rows = ws.get_all_values()
     if len(rows) <= 1:
+        _cache["items"] = []
+        _cache["timestamp"] = now
         return []
 
     headers = rows[0]
@@ -154,6 +172,9 @@ def get_all_items() -> List[Dict[str, Any]]:
             item[header] = row[col_idx] if col_idx < len(row) else ""
         item["_row_index"] = row_idx  # 1-based gspread row number
         items.append(item)
+
+    _cache["items"] = items
+    _cache["timestamp"] = now
     return items
 
 
@@ -210,6 +231,7 @@ def update_item(queue_id: str, updates: Dict[str, str]) -> bool:
                 )
             if cells_to_update:
                 ws.update_cells(cells_to_update, value_input_option="USER_ENTERED")
+                _invalidate_cache()
             return True
     return False
 
@@ -260,12 +282,16 @@ def get_daily_sent_count() -> int:
 def get_stats() -> Dict[str, int]:
     """Return counts by status and daily sent count."""
     items = get_all_items()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0, "total": len(items)}
+    daily_sent = 0
     for item in items:
         s = item.get("status", "")
         if s in stats:
             stats[s] += 1
+        if s == "sent" and item.get("sent_at", "").startswith(today):
+            daily_sent += 1
 
-    stats["daily_sent"] = get_daily_sent_count()
+    stats["daily_sent"] = daily_sent
     stats["daily_limit"] = int(os.getenv("X_DAILY_REPLY_LIMIT", "17"))
     return stats
