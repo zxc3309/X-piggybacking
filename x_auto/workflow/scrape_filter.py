@@ -1043,7 +1043,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                     if expected_header not in current_headers:
                         col_position = idx + 1
                         print(f"Migrating scraped_output: adding column '{expected_header}' at position {col_position}")
-                        ws.insert_cols([expected_header], col=col_position)
+                        # insert_cols expects list of columns, each column is a list of values
+                        ws.insert_cols([[expected_header]], col=col_position)
                         current_headers.insert(idx, expected_header)
                 existing = ws.get_all_values()
 

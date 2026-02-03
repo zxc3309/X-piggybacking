@@ -84,7 +84,8 @@ def _ensure_worksheet(client: GoogleSheetsClient, ws_name: str):
             # Insert missing column at the correct position (1-based index for gspread)
             col_position = idx + 1
             logger.info(f"Migrating: adding column '{expected_header}' at position {col_position}")
-            ws.insert_cols([expected_header], col=col_position)
+            # insert_cols expects list of columns, each column is a list of values
+            ws.insert_cols([[expected_header]], col=col_position)
             # Update current_headers for subsequent checks
             current_headers.insert(idx, expected_header)
 
