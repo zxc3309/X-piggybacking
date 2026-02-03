@@ -847,6 +847,14 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         '5) "others" - news announcements, educational content, or posts that don\'t fit above categories. '
         "Respond with ONLY the category name exactly as shown in quotes.",
     )
+    question_prompt = prompt_map.get(
+        "question_prompt",
+        "You craft engaging questions as replies for a professional liquid fund account. "
+        "Read the user's post and propose a thoughtful question that invites further discussion. "
+        "The question should demonstrate understanding of the topic while encouraging the author "
+        "to share more insights. Keep it under 100 words (aim for brevity). "
+        "Do not include placeholders. Return only the question text.",
+    )
 
     matched: List[Dict[str, Any]] = []
     matched_with_profile: List[Dict[str, Any]] = []
@@ -943,12 +951,14 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 llm_result = get_llm_decision_with_reason(base_prompt, text)
                 is_match = llm_result["decision"]
 
-            # Generate reply recommendation, summary, and category only for matched posts
+            # Generate reply recommendation, summary, category, and question only for matched posts
             recommendation = ""
+            question_reco = ""
             summary = ""
             category = "others"
             if is_match:
                 recommendation = generate_reply_recommendation(text, prompt=reply_prompt)
+                question_reco = generate_reply_recommendation(text, prompt=question_prompt)
                 summary = generate_post_summary(text, prompt=summary_prompt)
                 category = categorize_post(text, prompt=category_prompt)
 
@@ -973,6 +983,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "profile_url": url,
                         "post": post,
                         "reply_reco": recommendation,
+                        "question_reco": question_reco,
                         "summary": summary,
                         "category": category,
                         "post_id": post.get("id") or post.get("postId") or "",
@@ -1016,12 +1027,24 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                     normalized = normalized[1:]
                 return normalized
 
+            # Define expected headers for scraped_output sheet
+            expected_headers = [
+                "profile_url", "post_content", "timestamp", "likes", "reposts", "replies", "bookmarks", "views",
+                "author", "reply_recommendation", "question_recommendation", "post_link", "summary", "category", "telegram_sent_at"
+            ]
+
             if not any(cell for r in existing for cell in r):
-                ws.append_row(
-                    ["profile_url", "post_content", "timestamp", "likes", "reposts", "replies", "bookmarks", "views",
-                     "author", "reply_recommendation", "post_link", "summary", "category", "telegram_sent_at"],
-                    value_input_option="USER_ENTERED",
-                )
+                ws.append_row(expected_headers, value_input_option="USER_ENTERED")
+                existing = ws.get_all_values()
+            else:
+                # Auto-migrate: check for missing columns and insert them
+                current_headers = existing[0] if existing else []
+                for idx, expected_header in enumerate(expected_headers):
+                    if expected_header not in current_headers:
+                        col_position = idx + 1
+                        print(f"Migrating scraped_output: adding column '{expected_header}' at position {col_position}")
+                        ws.insert_cols([expected_header], col=col_position)
+                        current_headers.insert(idx, expected_header)
                 existing = ws.get_all_values()
 
             existing_pairs = set()
@@ -1035,6 +1058,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 profile_url = (item["profile_url"] or "").strip()
                 text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
                 reply_reco = item.get("reply_reco", "")
+                question_reco = item.get("question_reco", "")
                 summary = item.get("summary", "")
                 category = item.get("category", "others")
                 ts_raw = item.get("timestamp") or post.get("timestamp") or ""
@@ -1064,7 +1088,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 if key in existing_pairs:
                     continue
                 rows.append([profile_url, text, ts_human, likes, reposts, replies, bookmarks, views,
-                            author, reply_reco, post_link, summary, category, ""])
+                            author, reply_reco, question_reco, post_link, summary, category, ""])
             if rows:
                 ws.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
             print(f"Wrote {len(rows)} rows to output sheet '{output_ws_name}'.")
@@ -1090,12 +1114,14 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         post_link = f"https://x.com/i/web/status/{post_id}"
 
                 reply_reco = item.get("reply_reco", "")
+                question_reco = item.get("question_reco", "")
                 if reply_reco:
                     queue_items.append({
                         "post_link": post_link,
                         "author": author,
                         "post_content": text,
                         "reply_recommendation": reply_reco,
+                        "question_recommendation": question_reco,
                         "post_id": post_id,
                     })
 

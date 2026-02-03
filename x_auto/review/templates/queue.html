@@ -52,8 +52,15 @@
 
         {% if item.original_reply %}
         <div class="reply-preview">
-            <div class="reply-label">AI Reply</div>
+            <div class="reply-label">💬 AI Reply</div>
             {{ item.edited_reply or item.original_reply }}
+        </div>
+        {% endif %}
+
+        {% if item.original_question %}
+        <div class="reply-preview" style="border-left-color: var(--yellow, #f59e0b);">
+            <div class="reply-label">❓ AI Question</div>
+            {{ item.original_question }}
         </div>
         {% endif %}
 

@@ -287,6 +287,20 @@
         }
         .copy-btn:hover { background: var(--surface-hover); color: var(--text); }
 
+        /* Suggestion boxes for AI suggestions */
+        .suggestion-box {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 12px 16px;
+        }
+        .suggestion-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
         /* Responsive */
         @media (max-width: 480px) {
             .card-actions { flex-direction: column; }

@@ -32,6 +32,7 @@ REPLY_QUEUE_HEADERS = [
     "post_content",
     "original_reply",
     "edited_reply",
+    "original_question",  # AI question-style recommendation for engagement
     "status",
     "created_at",
     "approved_at",
@@ -56,7 +57,11 @@ def _get_client() -> GoogleSheetsClient:
 
 
 def _ensure_worksheet(client: GoogleSheetsClient, ws_name: str):
-    """Get or create the reply_queue worksheet with headers."""
+    """Get or create the reply_queue worksheet with headers.
+
+    Also performs automatic migration to add any missing columns from
+    REPLY_QUEUE_HEADERS to existing sheets.
+    """
     try:
         ws = client.get_sheet(ws_name)
     except RuntimeError:
@@ -70,6 +75,18 @@ def _ensure_worksheet(client: GoogleSheetsClient, ws_name: str):
     existing = ws.get_all_values()
     if not existing or not any(cell for cell in existing[0]):
         ws.append_row(REPLY_QUEUE_HEADERS, value_input_option="USER_ENTERED")
+        return ws
+
+    # Auto-migrate: check for missing columns and insert them
+    current_headers = existing[0] if existing else []
+    for idx, expected_header in enumerate(REPLY_QUEUE_HEADERS):
+        if expected_header not in current_headers:
+            # Insert missing column at the correct position (1-based index for gspread)
+            col_position = idx + 1
+            logger.info(f"Migrating: adding column '{expected_header}' at position {col_position}")
+            ws.insert_cols([expected_header], col=col_position)
+            # Update current_headers for subsequent checks
+            current_headers.insert(idx, expected_header)
 
     return ws
 
@@ -127,6 +144,7 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
             item.get("post_content", ""),
             item.get("reply_recommendation", ""),
             "",           # edited_reply
+            item.get("question_recommendation", ""),  # original_question
             "pending",    # status
             now,          # created_at
             "",           # approved_at

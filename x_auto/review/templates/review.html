@@ -43,17 +43,39 @@
     </div>
 </div>
 
-<!-- AI generated reply -->
+<!-- AI generated suggestions -->
 <div class="section">
-    <div class="section-label" style="display: flex; align-items: center; justify-content: space-between;">
-        AI Suggested Reply
-        <button class="copy-btn" onclick="copyToEditor()">Copy to editor ↓</button>
-    </div>
-    <div class="reply-preview" id="ai-reply">
-        {{ item.original_reply }}
-    </div>
-    <div class="char-counter">
-        {{ item.original_reply | length }} / 280 characters
+    <div class="section-label">AI Suggestions</div>
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        <!-- Reply suggestion -->
+        <div class="suggestion-box">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span class="suggestion-label">💬 Reply Suggestion</span>
+                <button class="copy-btn" onclick="copyReplyToEditor()">Use this ↓</button>
+            </div>
+            <div class="reply-preview" id="ai-reply">
+                {{ item.original_reply }}
+            </div>
+            <div class="char-counter">
+                {{ item.original_reply | length }} / 280 characters
+            </div>
+        </div>
+
+        <!-- Question suggestion -->
+        {% if item.original_question %}
+        <div class="suggestion-box" style="border-left-color: var(--yellow, #f59e0b);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <span class="suggestion-label">❓ Question Suggestion</span>
+                <button class="copy-btn" onclick="copyQuestionToEditor()">Use this ↓</button>
+            </div>
+            <div class="reply-preview" id="ai-question" style="border-left-color: var(--yellow, #f59e0b);">
+                {{ item.original_question }}
+            </div>
+            <div class="char-counter">
+                {{ item.original_question | length }} / 280 characters
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -123,11 +145,26 @@
         counter.textContent = '0';
     }
 
-    function copyToEditor() {
+    function copyReplyToEditor() {
         const aiText = document.getElementById('ai-reply').textContent.trim();
         textarea.value = aiText;
         updateCounter();
         textarea.focus();
+    }
+
+    function copyQuestionToEditor() {
+        const questionEl = document.getElementById('ai-question');
+        if (questionEl) {
+            const questionText = questionEl.textContent.trim();
+            textarea.value = questionText;
+            updateCounter();
+            textarea.focus();
+        }
+    }
+
+    // Keep legacy function for backwards compatibility
+    function copyToEditor() {
+        copyReplyToEditor();
     }
 
     // Warn before approving over-limit replies
