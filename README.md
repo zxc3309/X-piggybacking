@@ -1,17 +1,21 @@
 # X Automation Starter
 
-This project automates X (Twitter) monitoring: scrapes posts from target profiles, evaluates them with AI, categorizes content, generates reply recommendations, and sends daily summaries via Telegram.
+This project automates X (Twitter) monitoring: scrapes posts from target profiles, evaluates them with AI, categorizes content, generates reply recommendations, queues them for human review, and auto-posts approved replies.
 
 ## Features
+
 - **Profile monitoring** - Track X handles from Google Sheets
 - **Apify scraping** - Fetch recent posts via `scraper_one/x-profile-posts-scraper`
 - **AI-powered filtering** - LLM evaluates each post for relevance (decision recorded as 0/1)
 - **Post categorization** - Auto-categorize posts (token_analysis, industry_analysis, market_comment, etc.)
 - **Smart summaries** - Generate concise headlines for quick review
 - **Reply generation** - AI-powered reply recommendations
+- **Question recommendations** - Suggested follow-up questions for engagement
+- **Review Dashboard** - Web UI for approve/reject/edit reply candidates
+- **Auto-sender** - Posts approved replies to X with daily limits (17/day for X Free tier)
 - **Telegram notifications** - Daily summaries organized by category with emoji indicators
-- **Google Sheets logging** - Track all posts and decisions
-- **Scheduled execution** - Run on Railway, cron, or GitHub Actions
+- **Google Sheets logging** - Track all posts, decisions, and reply queue
+- **Scheduled execution** - Run on Railway with APScheduler (daily scrape + 5-min reply checks)
 
 ## Setup
 
@@ -39,27 +43,44 @@ cp .env.example .env
 
 # 3. Share Google Sheets with service account email (from JSON file)
 
-# 4. Run
-python main.py
+# 4. Run the web server (includes scheduler + dashboard)
+python app.py
 ```
 
 ## Usage
 
 ```bash
-# Run main workflow (scrape + filter + notify)
+# Start web server with scheduler and review dashboard
+python app.py
+# Dashboard available at: http://localhost:8080/dashboard
+
+# Run scrape workflow only (no server)
 python main.py
 
 # Scrape and store posts only
 python scrape_and_store.py
 
+# Manual scrape trigger via scheduler
+python scheduler.py --run-now
+
 # Update LLM prompts from Google Sheets
 python scripts/update_prompt.py
 ```
 
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Service info |
+| `/health` | GET | Health check for Railway |
+| `/trigger` | POST | Manually trigger scrape job |
+| `/status` | GET | Scheduler status and config |
+| `/dashboard/` | GET | Review dashboard (mounted app) |
+
 ## Architecture
 
 ```
-Google Sheets (profiles)
+Google Sheets (Researcher)
         │
         ▼
    Apify Scraper ──────► Raw Posts
@@ -68,13 +89,22 @@ Google Sheets (profiles)
    LLM Filter (OpenAI) ──► Scored Posts
         │
         ▼
-   Categorizer ──────────► Categorized Posts
+   Categorizer + Reply Generator
         │
-        ├──► Google Sheets (logs)
+        ├──► all_post (all decisions)
+        ├──► scraped_output (matched only)
+        ├──► reply_queue (pending approval)
         └──► Telegram (daily summary)
+                │
+        ┌───────┴───────┐
+        ▼               ▼
+   Review Dashboard    Auto-Sender (5min)
+   (human approval)    (posts to X API)
 ```
 
 ## Structure
+- `app.py` - FastAPI web server with scheduler and mounted dashboard
+- `scheduler.py` - APScheduler for daily scrape and reply auto-sender jobs
 - `x_auto/config` - Environment loading and credential helpers
 - `x_auto/sheets` - Google Sheets read/write utilities
 - `x_auto/scrapers` - Apify integration for fetching posts
@@ -83,16 +113,139 @@ Google Sheets (profiles)
 - `x_auto/x_api` - X API client for posting replies
 - `x_auto/notifications` - Telegram bot integration for daily summaries
 - `x_auto/workflow` - End-to-end pipeline orchestration (scraping, filtering, LLM evaluation)
+- `x_auto/review` - Review dashboard and queue management
+- `x_auto/feedback` - Prompt version management and feedback analysis
 - `x_auto/utils` - Shared helpers (logging, rate limiting, ID tracking)
 - `scripts/` - Utility scripts for prompt updates and maintenance
 
 ## Google Sheets Structure
 
 **Single unified sheet** with these worksheets:
-- `profiles` (or `Researcher`) - Input: X handles to monitor
-- `prompts` (or `prompt_inuse`) - Input: LLM prompts for filtering/replies/categorization
-- `all_post` - Output: All scraped posts with llm_decision (0/1), reasons, engagement metrics
-- `scraped_output` - Output: Matched posts (llm_decision=1) with reply recommendations, summaries, categories
+
+| Worksheet | Env Variable | Purpose |
+|-----------|--------------|---------|
+| `Researcher` | `GOOGLE_WS_PROFILES` | Input: X handles to monitor |
+| `prompt_inuse` | `GOOGLE_WS_PROMPTS` | Input: Active LLM prompts (legacy) |
+| `prompt_history` | (hardcoded) | Prompt version management (single source of truth) |
+| `all_post` | `GOOGLE_WS_ALL_POST` | Output: All posts with LLM decisions (0/1) |
+| `scraped_output` | `GOOGLE_WS_SCRAPED_OUTPUT` | Output: Matched posts only (llm_decision=1) |
+| `reply_queue` | `GOOGLE_WS_REPLY_QUEUE` | Review queue for human approval |
+
+### Worksheet Columns
+
+**Researcher** (profiles to monitor):
+- `handle` - X username (without @)
+- `name` - Display name
+- `category` - Profile category
+
+**all_post** (all scraped posts):
+- `post_id`, `author`, `text`, `created_at`
+- `llm_decision` (0/1), `llm_reason`
+- `engagement_score`, `likes`, `retweets`, `replies`
+
+**scraped_output** (matched posts):
+- Same as all_post, plus:
+- `category`, `summary`, `reply_recommendation`, `question_recommendation`
+
+**reply_queue** (pending approvals):
+- `queue_id`, `post_id`, `post_link`, `author`
+- `original_reply`, `edited_reply`
+- `status` (pending/approved/rejected/sent/failed)
+- `approved_at`, `sent_at`, `error_message`
+
+## Environment Variables
+
+### Required
+```bash
+GOOGLE_SHEET_ID=your_google_sheet_id
+GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service_account.json
+APIFY_TOKEN=your_apify_token
+OPENAI_API_KEY=your_openai_api_key
+```
+
+### Google Sheets Worksheets
+```bash
+GOOGLE_WS_PROFILES=Researcher
+GOOGLE_WS_PROMPTS=prompt_inuse
+GOOGLE_WS_ALL_POST=all_post
+GOOGLE_WS_SCRAPED_OUTPUT=scraped_output
+GOOGLE_WS_REPLY_QUEUE=reply_queue
+```
+
+### X API (for posting)
+```bash
+ENABLE_X_POSTING=false          # Set to "true" to enable live posting
+X_API_KEY=your_x_api_key
+X_API_SECRET=your_x_api_secret
+X_ACCESS_TOKEN=your_x_access_token
+X_ACCESS_TOKEN_SECRET=your_x_access_token_secret
+```
+
+### Auto-Sender
+```bash
+X_DAILY_REPLY_LIMIT=17          # X Free tier limit (default: 17)
+REPLY_CHECK_INTERVAL_MIN=5      # Check approved replies every N minutes
+```
+
+### Telegram
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+ENABLE_TELEGRAM_NOTIFICATIONS=true
+REVIEW_DASHBOARD_URL=https://your-app.railway.app/dashboard  # For notification links
+```
+
+### Scraping
+```bash
+MAX_PROFILE_URLS=3              # Max profiles to process (0 = all)
+POST_RESULTS_LIMIT=3            # Posts per profile
+LOOKBACK_DAYS=30                # Only fetch posts from last N days
+```
+
+### Scheduler
+```bash
+COLLECTION_SCHEDULE_HOUR=8      # Daily scrape time (Asia/Taipei)
+COLLECTION_SCHEDULE_MINUTE=0
+```
+
+## Review Dashboard
+
+The review dashboard provides a web UI for managing AI-generated reply candidates.
+
+### Accessing the Dashboard
+
+- **Local**: http://localhost:8080/dashboard
+- **Railway**: https://your-app.railway.app/dashboard
+
+### Workflow
+
+1. **Daily scrape** generates reply candidates → stored in `reply_queue` with status `pending`
+2. **Review** each candidate in the dashboard:
+   - View original post and generated reply
+   - Edit the reply text (280 char limit enforced)
+   - **Approve** - marks status as `approved`, queued for auto-sender
+   - **Reject** - marks status as `rejected`
+   - **Save** - saves edits without changing status
+3. **Auto-sender** runs every 5 minutes:
+   - Fetches `approved` items (FIFO by `approved_at`)
+   - Posts to X via API (if `ENABLE_X_POSTING=true`)
+   - Marks as `sent` on success, `failed` on error
+   - Respects `X_DAILY_REPLY_LIMIT` (default 17/day for X Free tier)
+
+### Dashboard Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/review` | GET | List all pending replies |
+| `/review?status=approved` | GET | Filter by status |
+| `/review/{queue_id}` | GET | Detail view for editing |
+| `/review/{id}/approve` | POST | Approve with optional edit |
+| `/review/{id}/reject` | POST | Reject a reply |
+| `/review/{id}/save` | POST | Save edits without approving |
+| `/api/stats` | GET | JSON stats (quota, counts) |
+| `/api/approve/{id}` | POST | AJAX approve |
+| `/api/reject/{id}` | POST | AJAX reject |
+| `/api/save/{id}` | POST | AJAX save draft |
 
 ## Telegram Notifications
 
@@ -163,7 +316,16 @@ Each `prompt_name` has independent version management in `prompt_history`:
 
 Only one version per `prompt_name` can have `status="active"` at a time.
 
+## Deployment on Railway
+
+1. Connect your GitHub repo to Railway
+2. Set environment variables in Railway dashboard
+3. Railway auto-detects Python and runs `python app.py`
+4. Health checks via `/health` endpoint
+5. Scheduler runs automatically (daily scrape + 5-min reply checks)
+
 ## Next Steps
-- Review and adjust LLM prompts in the `prompts` worksheet for optimal filtering
+- Review and adjust LLM prompts in the `prompt_history` worksheet for optimal filtering
 - Monitor API costs and performance (Apify, OpenAI usage)
 - Set `ENABLE_X_POSTING=true` when ready to post live replies to X
+- Configure `REVIEW_DASHBOARD_URL` for Telegram notification links
