@@ -47,6 +47,7 @@ async def lifespan(app: FastAPI):
 
     scheduler = XScraperScheduler(background_mode=True)
     scheduler.add_daily_scrape_job()
+    scheduler.add_reply_sender_job()  # Check approved replies every 5 min
     scheduler.start()
 
     status = scheduler.get_status()
