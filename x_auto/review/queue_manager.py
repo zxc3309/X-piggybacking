@@ -44,7 +44,7 @@ VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed"}
 
 # Simple in-memory cache to avoid repeated Google Sheets API calls
 _cache: Dict[str, Any] = {"items": None, "timestamp": 0.0}
-_CACHE_TTL = 10  # seconds
+_CACHE_TTL = 30  # seconds (increased for better performance)
 
 
 def _get_ws_name() -> str:
@@ -156,7 +156,11 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
     if rows:
         ws.append_rows(rows, value_input_option="USER_ENTERED")
         logger.info(f"Added {len(rows)} items to reply_queue")
-        _invalidate_cache()
+        # Update cache with new items instead of invalidating
+        for row in rows:
+            new_item = dict(zip(REPLY_QUEUE_HEADERS, row))
+            new_item["_row_index"] = len(existing) + rows.index(row) + 1
+            _append_to_cache(new_item)
 
     return len(rows)
 
@@ -165,6 +169,28 @@ def _invalidate_cache():
     """Clear the cache so the next read fetches fresh data."""
     _cache["items"] = None
     _cache["timestamp"] = 0.0
+
+
+def _update_cache_item(queue_id: str, updates: Dict[str, str]):
+    """Update a single item in cache without invalidating.
+
+    This allows instant UI feedback without refetching from Google Sheets.
+    """
+    if _cache["items"] is None:
+        return
+    for item in _cache["items"]:
+        if item.get("queue_id") == queue_id:
+            item.update(updates)
+            break
+
+
+def _append_to_cache(new_item: Dict[str, Any]):
+    """Append a new item to the cache without invalidating.
+
+    This allows instant UI feedback after adding items.
+    """
+    if _cache["items"] is not None:
+        _cache["items"].append(new_item)
 
 
 def get_all_items() -> List[Dict[str, Any]]:
@@ -250,7 +276,8 @@ def update_item(queue_id: str, updates: Dict[str, str]) -> bool:
                 )
             if cells_to_update:
                 ws.update_cells(cells_to_update, value_input_option="USER_ENTERED")
-                _invalidate_cache()
+                # Update cache directly instead of invalidating
+                _update_cache_item(queue_id, updates)
             return True
     return False
 

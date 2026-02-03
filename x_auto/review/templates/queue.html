@@ -71,19 +71,11 @@
         <div class="card-actions">
             <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Details</a>
             {% if item.status == 'pending' %}
-            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve" style="display:inline;">
-                <input type="hidden" name="edited_reply" value="">
-                <button type="submit" class="btn btn-approve btn-sm">Approve</button>
-            </form>
-            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/reject" style="display:inline;">
-                <button type="submit" class="btn btn-reject btn-sm">Reject</button>
-            </form>
+            <button type="button" class="btn btn-approve btn-sm" onclick="approveItem('{{ item.queue_id }}', '', this)">Approve</button>
+            <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
             {% endif %}
             {% if item.status == 'failed' %}
-            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve" style="display:inline;">
-                <input type="hidden" name="edited_reply" value="">
-                <button type="submit" class="btn btn-approve btn-sm">Retry</button>
-            </form>
+            <button type="button" class="btn btn-approve btn-sm" onclick="approveItem('{{ item.queue_id }}', '', this)">Retry</button>
             {% endif %}
             {% if item.post_link %}
             <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>

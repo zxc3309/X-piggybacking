@@ -8,6 +8,11 @@ Endpoints:
     POST /review/{id}/reject  — Reject a reply
     POST /review/{id}/save    — Save edits without approving
     GET  /api/stats           — JSON stats (daily quota, status counts)
+
+    JSON API (for AJAX non-blocking UI):
+    POST /api/approve/{id}    — Approve via AJAX (returns JSON)
+    POST /api/reject/{id}     — Reject via AJAX (returns JSON)
+    POST /api/save/{id}       — Save draft via AJAX (returns JSON)
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -166,3 +171,82 @@ async def api_stats():
     except Exception as e:
         logger.error(f"Failed to get stats: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# JSON API for AJAX operations (non-blocking UI updates)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/approve/{queue_id}")
+async def api_approve(request: Request, queue_id: str):
+    """Approve a reply via AJAX, optionally with edited text."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    edited_reply = (data.get("edited_reply") or "").strip()
+
+    # Validate character count
+    if len(edited_reply) > 280:
+        return JSONResponse(
+            {"success": False, "error": "Reply exceeds 280 characters"},
+            status_code=400
+        )
+
+    try:
+        success = queue_manager.approve_item(queue_id, edited_reply=edited_reply)
+    except Exception as e:
+        logger.error(f"API: Failed to approve {queue_id}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse(
+            {"success": False, "error": "Item not found"},
+            status_code=404
+        )
+
+    return JSONResponse({"success": True, "status": "approved"})
+
+
+@app.post("/api/reject/{queue_id}")
+async def api_reject(queue_id: str):
+    """Reject a reply via AJAX."""
+    try:
+        success = queue_manager.reject_item(queue_id)
+    except Exception as e:
+        logger.error(f"API: Failed to reject {queue_id}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse(
+            {"success": False, "error": "Item not found"},
+            status_code=404
+        )
+
+    return JSONResponse({"success": True, "status": "rejected"})
+
+
+@app.post("/api/save/{queue_id}")
+async def api_save(request: Request, queue_id: str):
+    """Save edits without approving via AJAX."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+
+    edited_reply = (data.get("edited_reply") or "").strip()
+
+    try:
+        success = queue_manager.update_item(queue_id, {"edited_reply": edited_reply})
+    except Exception as e:
+        logger.error(f"API: Failed to save {queue_id}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse(
+            {"success": False, "error": "Item not found"},
+            status_code=404
+        )
+
+    return JSONResponse({"success": True})

@@ -80,7 +80,7 @@
 </div>
 
 <!-- Editable reply -->
-<form id="review-form" method="post" action="{{ prefix }}/review/{{ item.queue_id }}/approve">
+<div id="review-form">
     <div class="section">
         <div class="section-label">Your Reply (editable)</div>
         <textarea
@@ -97,16 +97,14 @@
 
     <div class="card-actions" style="margin: 24px 0; justify-content: space-between;">
         <div>
-            <form method="post" action="{{ prefix }}/review/{{ item.queue_id }}/reject" style="display: inline;">
-                <button type="submit" class="btn btn-reject" formaction="{{ prefix }}/review/{{ item.queue_id }}/reject">Reject</button>
-            </form>
+            <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
         </div>
         <div style="display: flex; gap: 8px;">
-            <button type="submit" class="btn btn-save" formaction="{{ prefix }}/review/{{ item.queue_id }}/save">Save Draft</button>
-            <button type="submit" class="btn btn-approve">Approve & Send</button>
+            <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
+            <button type="button" id="approve-btn" class="btn btn-approve">Approve & Send</button>
         </div>
     </div>
-</form>
+</div>
 
 <!-- Timestamps -->
 <div class="section" style="padding-bottom: 32px;">
@@ -125,6 +123,7 @@
     const counter = document.getElementById('char-count');
     const counterDiv = document.getElementById('char-counter');
     const MAX_CHARS = 280;
+    const QUEUE_ID = '{{ item.queue_id }}';
 
     function updateCounter() {
         const len = textarea.value.length;
@@ -167,19 +166,43 @@
         copyReplyToEditor();
     }
 
-    // Warn before approving over-limit replies
-    document.getElementById('review-form').addEventListener('submit', function(e) {
-        const btn = e.submitter;
-        if (btn && btn.classList.contains('btn-approve')) {
-            const text = textarea.value.trim();
-            // If textarea is empty, the original AI reply will be used
-            const aiText = document.getElementById('ai-reply').textContent.trim();
-            const replyText = text || aiText;
-            if (replyText.length > MAX_CHARS) {
-                e.preventDefault();
-                alert('Reply exceeds 280 characters (' + replyText.length + '). Please shorten it.');
-            }
+    // AJAX action handlers
+    document.getElementById('approve-btn').addEventListener('click', async function() {
+        const btn = this;
+        const text = textarea.value.trim();
+        // If textarea is empty, the original AI reply will be used
+        const aiText = document.getElementById('ai-reply').textContent.trim();
+        const replyText = text || aiText;
+
+        if (replyText.length > MAX_CHARS) {
+            alert('Reply exceeds 280 characters (' + replyText.length + '). Please shorten it.');
+            return;
         }
+
+        const result = await approveItem(QUEUE_ID, text, btn);
+        if (result.success) {
+            // Redirect back to queue after short delay
+            setTimeout(() => {
+                window.location.href = `${API_PREFIX}/review?status=pending`;
+            }, 500);
+        }
+    });
+
+    document.getElementById('reject-btn').addEventListener('click', async function() {
+        const btn = this;
+        const result = await rejectItem(QUEUE_ID, btn);
+        if (result.success) {
+            // Redirect back to queue after short delay
+            setTimeout(() => {
+                window.location.href = `${API_PREFIX}/review?status=pending`;
+            }, 500);
+        }
+    });
+
+    document.getElementById('save-btn').addEventListener('click', async function() {
+        const btn = this;
+        const text = textarea.value.trim();
+        await saveItem(QUEUE_ID, text, btn);
     });
 
     updateCounter();

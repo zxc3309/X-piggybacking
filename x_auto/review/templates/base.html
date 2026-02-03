@@ -318,6 +318,145 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
+    <script>
+        // Shared AJAX utility functions for non-blocking UI updates
+        const API_PREFIX = '{{ prefix }}';
+
+        async function apiRequest(url, options = {}) {
+            const defaults = {
+                headers: { 'Content-Type': 'application/json' },
+            };
+            const response = await fetch(url, { ...defaults, ...options });
+            return response;
+        }
+
+        async function approveItem(queueId, editedReply = '', btn = null) {
+            if (btn) {
+                btn.disabled = true;
+                btn.dataset.originalText = btn.textContent;
+                btn.textContent = 'Approving...';
+            }
+
+            try {
+                const res = await apiRequest(`${API_PREFIX}/api/approve/${queueId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ edited_reply: editedReply })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    // Update UI: find card and update status
+                    const card = btn ? btn.closest('.card') : null;
+                    if (card) {
+                        card.style.transition = 'opacity 0.3s';
+                        card.style.opacity = '0.5';
+                        const statusBadge = card.querySelector('.card-status');
+                        if (statusBadge) {
+                            statusBadge.textContent = 'approved';
+                            statusBadge.className = 'card-status status-approved';
+                        }
+                        // Remove action buttons
+                        const actions = card.querySelector('.card-actions');
+                        if (actions) {
+                            const forms = actions.querySelectorAll('form');
+                            forms.forEach(f => f.remove());
+                        }
+                    }
+                    return { success: true };
+                } else {
+                    throw new Error(data.error || 'Failed to approve');
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.originalText || 'Approve';
+                }
+                alert('Error: ' + err.message);
+                return { success: false, error: err.message };
+            }
+        }
+
+        async function rejectItem(queueId, btn = null) {
+            if (btn) {
+                btn.disabled = true;
+                btn.dataset.originalText = btn.textContent;
+                btn.textContent = 'Rejecting...';
+            }
+
+            try {
+                const res = await apiRequest(`${API_PREFIX}/api/reject/${queueId}`, {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    // Update UI: find card and update status
+                    const card = btn ? btn.closest('.card') : null;
+                    if (card) {
+                        card.style.transition = 'opacity 0.3s';
+                        card.style.opacity = '0.5';
+                        const statusBadge = card.querySelector('.card-status');
+                        if (statusBadge) {
+                            statusBadge.textContent = 'rejected';
+                            statusBadge.className = 'card-status status-rejected';
+                        }
+                        // Remove action buttons
+                        const actions = card.querySelector('.card-actions');
+                        if (actions) {
+                            const forms = actions.querySelectorAll('form');
+                            forms.forEach(f => f.remove());
+                        }
+                    }
+                    return { success: true };
+                } else {
+                    throw new Error(data.error || 'Failed to reject');
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.originalText || 'Reject';
+                }
+                alert('Error: ' + err.message);
+                return { success: false, error: err.message };
+            }
+        }
+
+        async function saveItem(queueId, editedReply, btn = null) {
+            if (btn) {
+                btn.disabled = true;
+                btn.dataset.originalText = btn.textContent;
+                btn.textContent = 'Saving...';
+            }
+
+            try {
+                const res = await apiRequest(`${API_PREFIX}/api/save/${queueId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ edited_reply: editedReply })
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    if (btn) {
+                        btn.textContent = 'Saved!';
+                        setTimeout(() => {
+                            btn.disabled = false;
+                            btn.textContent = btn.dataset.originalText || 'Save Draft';
+                        }, 1500);
+                    }
+                    return { success: true };
+                } else {
+                    throw new Error(data.error || 'Failed to save');
+                }
+            } catch (err) {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.originalText || 'Save Draft';
+                }
+                alert('Error: ' + err.message);
+                return { success: false, error: err.message };
+            }
+        }
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
