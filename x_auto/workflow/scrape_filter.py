@@ -425,19 +425,22 @@ def get_llm_decision_with_reason(prompt: str, post_text: str) -> Dict[str, Any]:
     """
     enhanced_prompt = (
         f"{prompt}\n\n"
-        "After your yes/no decision, provide a brief reason (1 sentence) for your decision. "
-        "Format: 'yes' or 'no', then reason on next line."
+        "OVERRIDE output format: On the first line, respond with ONLY '1' (keep) or '0' (discard). "
+        "On the second line, provide a brief reason (1 sentence)."
     )
 
     try:
         reply = call_chatgpt(enhanced_prompt, post_text, model="gpt-5.2", max_tokens=80)
         lines = reply.strip().split('\n', 1)
-        decision_text = lines[0].strip().lower()
+        first_line = lines[0].strip().lower()
         reason = lines[1].strip() if len(lines) > 1 else "No reason provided"
 
+        # Accept if first line contains "1" or "yes" (support both formats)
+        is_keep = ("1" in first_line and "0" not in first_line) or "yes" in first_line
+
         return {
-            "decision": "yes" in decision_text,
-            "decision_text": 1 if "yes" in decision_text else 0,
+            "decision": is_keep,
+            "decision_text": 1 if is_keep else 0,
             "reason": reason
         }
     except Exception as e:
@@ -563,12 +566,22 @@ def get_prompts_from_sheet() -> Dict[str, str]:
     """
     prompts_sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_PROMPTS_SHEET_ID")
     if not prompts_sheet_id:
+        print("[DEBUG] No GOOGLE_SHEET_ID found, returning empty prompt_map")
         return {}
 
     try:
         client = GoogleSheetsClient(spreadsheet_name="prompts_sheet", spreadsheet_id=prompts_sheet_id)
         ws = client.get_sheet("prompt_history")
         records = ws.get_all_records()
+
+        print(f"[DEBUG] prompt_history: found {len(records)} total records")
+
+        # Debug: show all records with their status
+        for i, record in enumerate(records):
+            name = record.get("prompt_name", "")
+            status = record.get("status", "")
+            text_preview = str(record.get("prompt_text") or "")[:50]
+            print(f"[DEBUG]   [{i}] prompt_name='{name}', status='{status}', text='{text_preview}...'")
 
         prompt_map: Dict[str, str] = {}
         for record in records:
@@ -578,8 +591,10 @@ def get_prompts_from_sheet() -> Dict[str, str]:
                 if name and text:
                     prompt_map[name] = text
 
+        print(f"[DEBUG] Loaded {len(prompt_map)} active prompts: {list(prompt_map.keys())}")
         return prompt_map
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] Exception loading prompts: {e}")
         return {}
 
 
@@ -856,6 +871,13 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         "Do not include placeholders. Return only the question text.",
     )
 
+    # Debug: show which prompts are from sheet vs fallback
+    prompt_names = ["match_prompt", "reply_prompt", "summary_prompt", "category_prompt", "question_prompt"]
+    print("[DEBUG] Prompt sources:")
+    for pname in prompt_names:
+        source = "FROM SHEET" if pname in prompt_map else "FALLBACK (default)"
+        print(f"[DEBUG]   {pname}: {source}")
+
     matched: List[Dict[str, Any]] = []
     matched_with_profile: List[Dict[str, Any]] = []
     all_posts_with_decisions: List[Dict[str, Any]] = []  # NEW: Track ALL posts with LLM decisions
@@ -942,7 +964,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 is_match = True
                 llm_result = {
                     "decision": True,
-                    "decision_text": "yes",
+                    "decision_text": 1,
                     "reason": f"Auto-pass: X Article detected ({article_url})"
                 }
                 print(f"   → Auto-pass: X Article detected ({article_url})")
@@ -1037,15 +1059,26 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 ws.append_row(expected_headers, value_input_option="USER_ENTERED")
                 existing = ws.get_all_values()
             else:
-                # Auto-migrate: check for missing columns and insert them
+                # Auto-migrate: check for missing columns and remap data
                 current_headers = existing[0] if existing else []
-                for idx, expected_header in enumerate(expected_headers):
-                    if expected_header not in current_headers:
-                        col_position = idx + 1
-                        print(f"Migrating scraped_output: adding column '{expected_header}' at position {col_position}")
-                        # insert_cols expects list of columns, each column is a list of values
-                        ws.insert_cols([[expected_header]], col=col_position)
-                        current_headers.insert(idx, expected_header)
+                missing = [h for h in expected_headers if h not in current_headers]
+                if missing:
+                    print(f"Migrating scraped_output: adding columns {missing}")
+                    # Build old header → column index mapping
+                    old_col_map = {h: i for i, h in enumerate(current_headers)}
+                    # Remap each data row to the new header order
+                    new_rows = [expected_headers]
+                    for row in existing[1:]:
+                        new_row = []
+                        for h in expected_headers:
+                            if h in old_col_map and old_col_map[h] < len(row):
+                                new_row.append(row[old_col_map[h]])
+                            else:
+                                new_row.append("")
+                        new_rows.append(new_row)
+                    # Clear sheet and rewrite
+                    ws.clear()
+                    ws.update(new_rows, value_input_option="USER_ENTERED")
                 existing = ws.get_all_values()
 
             existing_pairs = set()
@@ -1116,7 +1149,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
 
                 reply_reco = item.get("reply_reco", "")
                 question_reco = item.get("question_reco", "")
-                if reply_reco:
+                if reply_reco or question_reco:
                     queue_items.append({
                         "post_link": post_link,
                         "author": author,
