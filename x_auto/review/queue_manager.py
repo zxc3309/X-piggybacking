@@ -77,17 +77,26 @@ def _ensure_worksheet(client: GoogleSheetsClient, ws_name: str):
         ws.append_row(REPLY_QUEUE_HEADERS, value_input_option="USER_ENTERED")
         return ws
 
-    # Auto-migrate: check for missing columns and insert them
+    # Auto-migrate: check for missing columns and remap data
     current_headers = existing[0] if existing else []
-    for idx, expected_header in enumerate(REPLY_QUEUE_HEADERS):
-        if expected_header not in current_headers:
-            # Insert missing column at the correct position (1-based index for gspread)
-            col_position = idx + 1
-            logger.info(f"Migrating: adding column '{expected_header}' at position {col_position}")
-            # insert_cols expects list of columns, each column is a list of values
-            ws.insert_cols([[expected_header]], col=col_position)
-            # Update current_headers for subsequent checks
-            current_headers.insert(idx, expected_header)
+    missing = [h for h in REPLY_QUEUE_HEADERS if h not in current_headers]
+    if missing:
+        logger.info(f"Migrating: adding columns {missing}")
+        # Build old header → column index mapping
+        old_col_map = {h: i for i, h in enumerate(current_headers)}
+        # Remap each data row to the new header order
+        new_rows = [REPLY_QUEUE_HEADERS]
+        for row in existing[1:]:
+            new_row = []
+            for h in REPLY_QUEUE_HEADERS:
+                if h in old_col_map and old_col_map[h] < len(row):
+                    new_row.append(row[old_col_map[h]])
+                else:
+                    new_row.append("")
+            new_rows.append(new_row)
+        # Clear sheet and rewrite
+        ws.clear()
+        ws.update(new_rows, value_input_option="USER_ENTERED")
 
     return ws
 
@@ -216,6 +225,14 @@ def get_all_items() -> List[Dict[str, Any]]:
         for col_idx, header in enumerate(headers):
             item[header] = row[col_idx] if col_idx < len(row) else ""
         item["_row_index"] = row_idx  # 1-based gspread row number
+        # Normalize status - invalid statuses default to "pending"
+        status = item.get("status", "").strip().lower()
+        if status not in VALID_STATUSES:
+            if item.get("status"):  # Only log if there was a non-empty invalid status
+                logger.warning(f"Invalid status '{item.get('status')}' for queue_id={item.get('queue_id')}, defaulting to 'pending'")
+            item["status"] = "pending"
+        else:
+            item["status"] = status
         items.append(item)
 
     _cache["items"] = items
