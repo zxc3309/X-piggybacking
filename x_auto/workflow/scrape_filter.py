@@ -24,7 +24,7 @@ import requests
 from dotenv import load_dotenv
 
 from x_auto.scrapers.apify_client import fetch_posts
-from x_auto.scrapers.article_detector import is_article_post
+from x_auto.scrapers.article_detector import is_article_post, get_article_content_for_post
 from x_auto.sheets.client import GoogleSheetsClient
 
 
@@ -720,7 +720,12 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
         for item in all_posts_data:
             post = item["post"]
             profile_url = (item.get("profile_url") or "").strip()
-            text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
+            raw_text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
+            article_url = post.get("_article_url", "")
+            if article_url:
+                text = f"{raw_text} {article_url}".strip() if raw_text else article_url
+            else:
+                text = raw_text
             author = post.get("author", {}).get("userName", "")
 
             # Check for duplicates
@@ -954,24 +959,33 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         merged_recent = merge_threaded_posts(to_merge)
         for post in merged_recent:
             text = post.get("text") or post.get("postText") or ""
+            is_article, article_url = is_article_post(post)
+
+            # For any article post (or empty-text post that might be a pure article), fetch content
+            if is_article or not text:
+                article_content, fetched_article_url = get_article_content_for_post(post)
+                if article_content:
+                    is_article = True
+                    if not article_url:
+                        article_url = fetched_article_url
+                    if text:
+                        text = f"{text}\n\n--- Full Article ---\n\n{article_content}"
+                    else:
+                        text = article_content
+                    print(f"   → Fetched article content ({len(article_content)} chars)")
+                elif not text:
+                    continue  # no text and no article content, skip
+
             if not text:
                 continue
 
-            # Check if post contains an X Article link (auto-pass if so)
-            is_article, article_url = is_article_post(post)
+            # Store article URL for sheet display (avoid writing full article to post_content)
             if is_article:
-                # Article posts auto-pass LLM judgment
-                is_match = True
-                llm_result = {
-                    "decision": True,
-                    "decision_text": 1,
-                    "reason": f"Auto-pass: X Article detected ({article_url})"
-                }
-                print(f"   → Auto-pass: X Article detected ({article_url})")
-            else:
-                # Regular posts go through LLM judgment
-                llm_result = get_llm_decision_with_reason(base_prompt, text)
-                is_match = llm_result["decision"]
+                post["_article_url"] = article_url or ""
+
+            # All posts go through LLM judgment
+            llm_result = get_llm_decision_with_reason(base_prompt, text)
+            is_match = llm_result["decision"]
 
             # Generate reply recommendation, summary, category, and question only for matched posts
             recommendation = ""

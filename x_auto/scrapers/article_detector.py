@@ -155,3 +155,110 @@ def is_article_post(post: dict) -> Tuple[bool, Optional[str]]:
             return True, expanded_url
 
     return False, None
+
+
+def fetch_article_content(username: str, tweet_id: str, timeout: int = 15) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Fetch full article content from fxtwitter API.
+
+    Args:
+        username: The X username (without @)
+        tweet_id: The tweet/post ID
+        timeout: Request timeout in seconds
+
+    Returns:
+        Tuple of (content, article_url):
+        - content: Plain text article content, or None on failure
+        - article_url: The constructed article URL, or None
+    """
+    url = f"https://api.fxtwitter.com/{username}/status/{tweet_id}"
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        article = data.get("tweet", {}).get("article")
+        if not article:
+            logger.debug(f"No article content found for {username}/{tweet_id}")
+            return None, None
+
+        # Construct article URL from article ID
+        article_id = article.get("id", "")
+        article_url = f"https://x.com/i/article/{article_id}" if article_id else None
+
+        blocks = article.get("content", {}).get("blocks", [])
+        if not blocks:
+            return None, article_url
+
+        title = article.get("title", "")
+        text = _extract_text_from_blocks(blocks)
+        if title and text:
+            text = f"{title}\n\n{text}"
+        if text:
+            logger.info(f"Fetched article content ({len(text)} chars) for {username}/{tweet_id}")
+        return text or None, article_url
+
+    except requests.RequestException as e:
+        logger.warning(f"Failed to fetch article from fxtwitter for {username}/{tweet_id}: {e}")
+        return None, None
+    except (KeyError, ValueError) as e:
+        logger.warning(f"Failed to parse fxtwitter response for {username}/{tweet_id}: {e}")
+        return None, None
+
+
+def _extract_text_from_blocks(blocks: list) -> str:
+    """
+    Convert structured article blocks into plain text.
+
+    Handles the fxtwitter article block format where each block has:
+    - "type": "unstyled", "header-one", "header-two", "ordered-list-item", "atomic", etc.
+    - "text": the text content of the block
+
+    Args:
+        blocks: List of article block dicts from fxtwitter API
+
+    Returns:
+        Plain text string
+    """
+    parts = []
+    for block in blocks:
+        block_type = block.get("type", "")
+        text = block.get("text", "")
+
+        if not text:
+            continue
+
+        if block_type == "unstyled":
+            parts.append(text)
+        elif block_type in ("header-one", "header-two", "header-three"):
+            parts.append(f"\n{text}\n")
+        elif block_type in ("ordered-list-item", "unordered-list-item"):
+            parts.append(f"  - {text}")
+        else:
+            parts.append(text)
+
+    return "\n".join(parts).strip()
+
+
+def get_article_content_for_post(post: dict) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract article content for a post using fxtwitter API.
+
+    Extracts username and tweet_id from the post dict and fetches the article.
+
+    Args:
+        post: The post dictionary
+
+    Returns:
+        Tuple of (content, article_url):
+        - content: Plain text article content, or None on failure
+        - article_url: The article URL, or None
+    """
+    username = post.get("username") or post.get("authorUsername") or post.get("author", {}).get("userName", "")
+    tweet_id = post.get("id") or post.get("postId") or ""
+
+    if not username or not tweet_id:
+        logger.debug("Cannot fetch article: missing username or tweet_id")
+        return None, None
+
+    return fetch_article_content(username, str(tweet_id))
