@@ -3,118 +3,152 @@
 
 {% block header_right %}
 {% set ratio = stats.daily_sent / stats.daily_limit if stats.daily_limit > 0 else 0 %}
-<span class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
-    Today: {{ stats.daily_sent }}/{{ stats.daily_limit }}
-</span>
+{% set pct = (ratio * 100) | int %}
+<div class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
+    <span class="quota-bar-track">
+        <span class="quota-bar-fill" style="width: {% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></span>
+    </span>
+    <span class="quota-label">{{ stats.daily_sent }}/{{ stats.daily_limit }}</span>
+</div>
 {% endblock %}
 
 {% block content %}
-<div style="padding: 16px 0;">
+<div style="padding: 16px 0 8px;">
     <a class="btn btn-back" href="{{ prefix }}/review?status=pending">← Back to queue</a>
 </div>
 
-<!-- Status -->
-<div style="margin-bottom: 16px;">
-    <span class="card-status status-{{ item.status }}" style="font-size: 14px; padding: 4px 14px;">
+<!-- Status bar -->
+<div style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
+    <span class="card-status status-{{ item.status }}" style="font-size: 13px; padding: 3px 12px;">
         {{ item.status }}
     </span>
+    {% if item.author %}
+    <span style="font-size: 13px; color: var(--text-secondary);">
+        @{{ item.author }}
+    </span>
+    {% endif %}
     {% if item.error_message %}
-    <div class="error-msg" style="margin-top: 10px;">{{ item.error_message }}</div>
+    <div class="error-msg" style="margin: 0; flex: 1;">{{ item.error_message }}</div>
     {% endif %}
 </div>
 
-<!-- Original post -->
-<div class="section">
-    <div class="section-label">Original Post</div>
-    <div class="original-post">
-        <div class="card-header">
-            <span class="card-author">
-                {% if item.author %}
-                    <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
-                {% else %}
-                    Unknown author
+<!-- Two-column layout -->
+<div class="review-layout">
+
+    <!-- ── Left column: Original post + AI suggestions (sticky) ── -->
+    <div class="review-left">
+
+        <!-- Original post -->
+        <div class="section" style="margin-top: 0;">
+            <div class="section-label">Original Post</div>
+            <div class="original-post">
+                <div class="card-header">
+                    <span class="card-author">
+                        {% if item.author %}
+                            <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                        {% else %}
+                            Unknown author
+                        {% endif %}
+                    </span>
+                    {% if item.post_link %}
+                    <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
+                    {% endif %}
+                </div>
+                <div class="post-content">{{ item.post_content }}</div>
+            </div>
+        </div>
+
+        <!-- AI suggestions -->
+        <div class="section">
+            <div class="section-label">AI Suggestions</div>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+
+                <!-- Reply suggestion -->
+                <div class="suggestion-box">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span class="suggestion-label">// Reply</span>
+                        <button class="copy-btn" onclick="copyReplyToEditor()">Use this ↓</button>
+                    </div>
+                    <div class="reply-preview" id="ai-reply">{{ item.original_reply }}</div>
+                    <div class="char-counter">{{ item.original_reply | length }} / 280</div>
+                </div>
+
+                <!-- Question suggestion -->
+                {% if item.original_question %}
+                <div class="suggestion-box" style="border-left-color: var(--yellow);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span class="suggestion-label">// Question</span>
+                        <button class="copy-btn" style="color: var(--yellow); border-color: var(--border);" onclick="copyQuestionToEditor()">Use this ↓</button>
+                    </div>
+                    <div class="reply-preview" id="ai-question" style="border-left-color: var(--yellow);">{{ item.original_question }}</div>
+                    <div class="char-counter">{{ item.original_question | length }} / 280</div>
+                </div>
                 {% endif %}
-            </span>
-            {% if item.post_link %}
-            <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
-            {% endif %}
-        </div>
-        <div class="post-content">{{ item.post_content }}</div>
-    </div>
-</div>
 
-<!-- AI generated suggestions -->
-<div class="section">
-    <div class="section-label">AI Suggestions</div>
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-        <!-- Reply suggestion -->
-        <div class="suggestion-box">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                <span class="suggestion-label">💬 Reply Suggestion</span>
-                <button class="copy-btn" onclick="copyReplyToEditor()">Use this ↓</button>
-            </div>
-            <div class="reply-preview" id="ai-reply">
-                {{ item.original_reply }}
-            </div>
-            <div class="char-counter">
-                {{ item.original_reply | length }} / 280 characters
             </div>
         </div>
 
-        <!-- Question suggestion -->
-        {% if item.original_question %}
-        <div class="suggestion-box" style="border-left-color: var(--yellow, #f59e0b);">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                <span class="suggestion-label">❓ Question Suggestion</span>
-                <button class="copy-btn" onclick="copyQuestionToEditor()">Use this ↓</button>
-            </div>
-            <div class="reply-preview" id="ai-question" style="border-left-color: var(--yellow, #f59e0b);">
-                {{ item.original_question }}
-            </div>
-            <div class="char-counter">
-                {{ item.original_question | length }} / 280 characters
-            </div>
-        </div>
-        {% endif %}
-    </div>
-</div>
+    </div><!-- /review-left -->
 
-<!-- Editable reply -->
-<div id="review-form">
-    <div class="section">
-        <div class="section-label">Your Reply (editable)</div>
-        <textarea
-            class="edit-area"
-            id="edited-reply"
-            name="edited_reply"
-            placeholder="Edit the reply here, or leave empty to use AI suggestion..."
-            maxlength="500"
-        >{{ item.edited_reply }}</textarea>
-        <div class="char-counter" id="char-counter">
-            <span id="char-count">{{ item.edited_reply | length }}</span> / 280 characters
-        </div>
-    </div>
+    <!-- ── Right column: Edit + Actions + Audit ── -->
+    <div class="review-right">
 
-    <div class="card-actions" style="margin: 24px 0; justify-content: space-between;">
-        <div>
-            <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
-        </div>
-        <div style="display: flex; gap: 8px;">
-            <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
-            <button type="button" id="approve-btn" class="btn btn-approve">Approve & Send</button>
-        </div>
-    </div>
-</div>
+        <div id="review-form">
+            <div class="section" style="margin-top: 0;">
+                <div class="section-label">Your Reply</div>
+                <textarea
+                    class="edit-area"
+                    id="edited-reply"
+                    name="edited_reply"
+                    placeholder="Edit the reply here, or leave empty to use AI suggestion..."
+                    maxlength="500"
+                >{{ item.edited_reply }}</textarea>
 
-<!-- Timestamps -->
-<div class="section" style="padding-bottom: 32px;">
-    <div class="section-label">Audit Trail</div>
-    <div style="font-size: 13px; color: var(--text-secondary); line-height: 2;">
-        <div>Created: {{ item.created_at or "—" }}</div>
-        <div>Approved: {{ item.approved_at or "—" }}</div>
-        <div>Sent: {{ item.sent_at or "—" }}</div>
-    </div>
-</div>
+                <!-- Char progress bar -->
+                <div class="char-bar-wrap">
+                    <div class="char-bar-track">
+                        <div class="char-bar-fill" id="char-bar-fill"></div>
+                    </div>
+                    <div class="char-bar-label" id="char-counter">
+                        <span id="char-count">{{ item.edited_reply | length }}</span> / 280
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="card-actions" style="margin: 20px 0; justify-content: space-between;">
+                <div>
+                    <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
+                    <button type="button" id="approve-btn" class="btn btn-approve">Approve &amp; Send</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit trail -->
+        <div class="section" style="padding-bottom: 32px;">
+            <div class="section-label">Audit Trail</div>
+            <table class="audit-table">
+                <tr>
+                    <td class="audit-key">Created</td>
+                    <td class="audit-val">{{ item.created_at or "—" }}</td>
+                </tr>
+                <tr>
+                    <td class="audit-key">Approved</td>
+                    <td class="audit-val">{{ item.approved_at or "—" }}</td>
+                </tr>
+                <tr>
+                    <td class="audit-key">Sent</td>
+                    <td class="audit-val">{{ item.sent_at or "—" }}</td>
+                </tr>
+            </table>
+        </div>
+
+    </div><!-- /review-right -->
+
+</div><!-- /review-layout -->
 {% endblock %}
 
 {% block scripts %}
@@ -122,6 +156,7 @@
     const textarea = document.getElementById('edited-reply');
     const counter = document.getElementById('char-count');
     const counterDiv = document.getElementById('char-counter');
+    const barFill = document.getElementById('char-bar-fill');
     const MAX_CHARS = 280;
     const QUEUE_ID = '{{ item.queue_id }}';
 
@@ -129,10 +164,17 @@
         const len = textarea.value.length;
         counter.textContent = len;
         counterDiv.classList.remove('over', 'warn');
+        barFill.classList.remove('over', 'warn');
+
+        const pct = Math.min((len / MAX_CHARS) * 100, 100);
+        barFill.style.width = pct + '%';
+
         if (len > MAX_CHARS) {
             counterDiv.classList.add('over');
+            barFill.classList.add('over');
         } else if (len > MAX_CHARS * 0.9) {
             counterDiv.classList.add('warn');
+            barFill.classList.add('warn');
         }
     }
 

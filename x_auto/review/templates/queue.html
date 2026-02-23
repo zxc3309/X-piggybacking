@@ -3,9 +3,13 @@
 
 {% block header_right %}
 {% set ratio = stats.daily_sent / stats.daily_limit if stats.daily_limit > 0 else 0 %}
-<span class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
-    Today: {{ stats.daily_sent }}/{{ stats.daily_limit }}
-</span>
+{% set pct = (ratio * 100) | int %}
+<div class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
+    <span class="quota-bar-track">
+        <span class="quota-bar-fill" style="width: {% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></span>
+    </span>
+    <span class="quota-label">{{ stats.daily_sent }}/{{ stats.daily_limit }}</span>
+</div>
 {% endblock %}
 
 {% block content %}
@@ -33,33 +37,33 @@
 
 {% if items %}
     {% for item in items | reverse %}
-    <div class="card">
+    <div class="card" data-status="{{ item.status }}">
         <div class="card-header">
-            <span class="card-author">
-                {% if item.author %}
-                    <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
-                {% else %}
-                    Unknown author
-                {% endif %}
-            </span>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-time">{{ item.created_at }}</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="card-author">
+                    {% if item.author %}
+                        <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                    {% else %}
+                        Unknown author
+                    {% endif %}
+                </span>
                 <span class="card-status status-{{ item.status }}">{{ item.status }}</span>
             </div>
+            <span class="card-time">{{ item.created_at }}</span>
         </div>
 
         <div class="post-content truncated">{{ item.post_content }}</div>
 
         {% if item.original_reply %}
         <div class="reply-preview">
-            <div class="reply-label">💬 AI Reply</div>
+            <div class="reply-label">// REPLY</div>
             {{ item.edited_reply or item.original_reply }}
         </div>
         {% endif %}
 
         {% if item.original_question %}
-        <div class="reply-preview" style="border-left-color: var(--yellow, #f59e0b);">
-            <div class="reply-label">❓ AI Question</div>
+        <div class="reply-preview" style="border-left-color: var(--yellow);">
+            <div class="reply-label" style="color: var(--yellow);">// QUESTION</div>
             {{ item.original_question }}
         </div>
         {% endif %}
@@ -69,7 +73,6 @@
         {% endif %}
 
         <div class="card-actions">
-            <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Details</a>
             {% if item.status == 'pending' %}
             <button type="button" class="btn btn-approve btn-sm" onclick="approveItem('{{ item.queue_id }}', '', this)">Approve</button>
             <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
@@ -80,12 +83,13 @@
             {% if item.post_link %}
             <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
             {% endif %}
+            <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Detail →</a>
         </div>
     </div>
     {% endfor %}
 {% else %}
     <div class="empty-state">
-        <div class="empty-state-icon">📭</div>
+        <div class="empty-state-icon">[ --- ]</div>
         <h2>No items{% if current_filter %} with status "{{ current_filter }}"{% endif %}</h2>
         <p>When AI-generated replies are created, they'll appear here for review.</p>
     </div>
