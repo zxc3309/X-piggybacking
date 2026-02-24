@@ -13,6 +13,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 - **Question recommendations** - Suggested follow-up questions for engagement
 - **Review Dashboard** - Web UI for approve/reject/edit reply candidates
 - **Auto-sender** - Posts approved replies to X with daily limits (17/day for X Free tier)
+- **Second Brain integration** - Query personal knowledge base (cesecondbrain-api) for related notes, enrich replies with your own perspective
 - **Telegram notifications** - Daily summaries organized by category with emoji indicators
 - **Google Sheets logging** - Track all posts, decisions, and reply queue
 - **Scheduled execution** - Run on Railway with APScheduler (daily scrape + 5-min reply checks)
@@ -31,6 +32,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 | OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/) > API keys |
 | X API | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | [developer.twitter.com](https://developer.twitter.com/) (only needed for posting) |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | [@BotFather](https://t.me/botfather) for token, [@userinfobot](https://t.me/userinfobot) for chat ID |
+| Second Brain | `BRAIN_API_URL`, `BRAIN_API_KEY` | Your cesecondbrain-api instance |
 
 ### Quick Start
 ```bash
@@ -89,7 +91,7 @@ Google Sheets (Researcher)
    LLM Filter (OpenAI) ──► Scored Posts
         │
         ▼
-   Categorizer + Reply Generator
+   Categorizer + Reply Generator ◄── Second Brain (cesecondbrain-api)
         │
         ├──► all_post (all decisions)
         ├──► scraped_output (matched only)
@@ -114,6 +116,7 @@ Google Sheets (Researcher)
 - `x_auto/notifications` - Telegram bot integration for daily summaries
 - `x_auto/workflow` - End-to-end pipeline orchestration (scraping, filtering, LLM evaluation)
 - `x_auto/review` - Review dashboard and queue management
+- `x_auto/brain` - Second Brain (cesecondbrain-api) client for knowledge base search
 - `x_auto/feedback` - Prompt version management and feedback analysis
 - `x_auto/utils` - Shared helpers (logging, rate limiting, ID tracking)
 - `scripts/` - Utility scripts for prompt updates and maintenance
@@ -146,6 +149,7 @@ Google Sheets (Researcher)
 **scraped_output** (matched posts):
 - Same as all_post, plus:
 - `category`, `summary`, `reply_recommendation`, `question_recommendation`
+- `brain_context`, `related_notes_count` - Second Brain analysis and match count
 
 **reply_queue** (pending approvals):
 - `queue_id`, `post_id`, `post_link`, `author`
@@ -185,6 +189,14 @@ X_ACCESS_TOKEN_SECRET=your_x_access_token_secret
 ```bash
 X_DAILY_REPLY_LIMIT=17          # X Free tier limit (default: 17)
 REPLY_CHECK_INTERVAL_MIN=5      # Check approved replies every N minutes
+```
+
+### Second Brain (cesecondbrain-api)
+```bash
+BRAIN_API_URL=https://brain.example.com   # Your cesecondbrain-api URL
+BRAIN_API_KEY=your_brain_api_key
+BRAIN_SEARCH_LIMIT=5                      # Max related notes to retrieve
+BRAIN_ENABLED=true                        # Set to "false" to disable
 ```
 
 ### Telegram

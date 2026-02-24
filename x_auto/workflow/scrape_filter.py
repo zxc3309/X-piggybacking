@@ -829,6 +829,9 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     # Build LLM prompts from the prompts sheet (or defaults).
     prompt_map = get_prompts_from_sheet()
 
+    from x_auto.brain.client import BrainClient
+    brain_client = BrainClient()
+
     # Get active prompt version from prompt_history
     active_version = get_active_prompt_version(sheet_client, "match_prompt")
     print(f"Using prompt version: {active_version}")
@@ -992,8 +995,25 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
             question_reco = ""
             summary = ""
             category = "others"
+            brain_context = ""
+            brain_result = None
             if is_match:
-                recommendation = generate_reply_recommendation(text, prompt=reply_prompt)
+                # Query brain API + generate note context analysis
+                brain_result = brain_client.get_note_context(text[:500], call_chatgpt)
+                if brain_result and brain_result.get("total", 0) > 0:
+                    brain_context = brain_result.get("brain_context", "")
+                    print(f"   [Brain] Found {brain_result['total']} related notes")
+
+                # Enrich reply prompt with note context if available
+                enriched_reply_prompt = reply_prompt
+                if brain_context:
+                    enriched_reply_prompt = (
+                        f"{reply_prompt}\n\n"
+                        "Reference from your Second Brain (use to add your perspective if relevant):\n"
+                        f"{brain_context}"
+                    )
+
+                recommendation = generate_reply_recommendation(text, prompt=enriched_reply_prompt)
                 question_reco = generate_reply_recommendation(text, prompt=question_prompt)
                 summary = generate_post_summary(text, prompt=summary_prompt)
                 category = categorize_post(text, prompt=category_prompt)
@@ -1024,6 +1044,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "category": category,
                         "post_id": post.get("id") or post.get("postId") or "",
                         "timestamp": post.get("timestamp"),
+                        "brain_context": brain_context,
+                        "brain_total": brain_result.get("total", 0) if brain_result else 0,
                     }
                 )
 
@@ -1047,7 +1069,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     # New env var with fallback to legacy
     output_sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_SCRAPE_OUTPUT")
     output_ws_name = os.getenv("GOOGLE_WS_SCRAPED_OUTPUT") or os.getenv("GOOGLE_X_SCRAPE_OUTPUT_WORKSHEET", "scraped_output")
-    if output_sheet_id and matched_with_profile:
+    if output_sheet_id:
         try:
             out_client = GoogleSheetsClient(
                 spreadsheet_name="scrape_output",
@@ -1066,7 +1088,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
             # Define expected headers for scraped_output sheet
             expected_headers = [
                 "profile_url", "post_content", "timestamp", "likes", "reposts", "replies", "bookmarks", "views",
-                "author", "reply_recommendation", "question_recommendation", "post_link", "summary", "category", "telegram_sent_at"
+                "author", "reply_recommendation", "question_recommendation", "post_link", "summary", "category", "telegram_sent_at",
+                "brain_context", "related_notes_count",
             ]
 
             if not any(cell for r in existing for cell in r):
@@ -1095,51 +1118,57 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                     ws.update(new_rows, value_input_option="USER_ENTERED")
                 existing = ws.get_all_values()
 
-            existing_pairs = set()
-            for row in existing[1:]:
-                norm = normalize_row(row)
-                if len(norm) >= 3:
-                    existing_pairs.add((norm[0].strip(), norm[1].strip(), norm[2].strip()))
-            rows = []
-            for item in matched_with_profile:
-                post = item["post"]
-                profile_url = (item["profile_url"] or "").strip()
-                text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
-                reply_reco = item.get("reply_reco", "")
-                question_reco = item.get("question_reco", "")
-                summary = item.get("summary", "")
-                category = item.get("category", "others")
-                ts_raw = item.get("timestamp") or post.get("timestamp") or ""
-                created_at = post.get("createdAt") or ""
-                ts_str = str(ts_raw) if ts_raw is not None else ""
-                ts_human = format_timestamp(ts_raw, created_at)
-                post_id = item.get("post_id", "")
-                author = post.get("author", {}).get("userName", "")
-                # Build post link - use standard format for better mobile app deep linking
-                post_link = post.get("postUrl") or post.get("url")
-                if not post_link and post_id:
-                    if author:
-                        # Standard format triggers iOS/Android Universal Links for X app
-                        post_link = f"https://x.com/{author}/status/{post_id}"
-                    else:
-                        post_link = f"https://x.com/i/web/status/{post_id}"
+            if matched_with_profile:
+                existing_pairs = set()
+                for row in existing[1:]:
+                    norm = normalize_row(row)
+                    if len(norm) >= 3:
+                        existing_pairs.add((norm[0].strip(), norm[1].strip(), norm[2].strip()))
+                rows = []
+                for item in matched_with_profile:
+                    post = item["post"]
+                    profile_url = (item["profile_url"] or "").strip()
+                    text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
+                    reply_reco = item.get("reply_reco", "")
+                    question_reco = item.get("question_reco", "")
+                    summary = item.get("summary", "")
+                    category = item.get("category", "others")
+                    ts_raw = item.get("timestamp") or post.get("timestamp") or ""
+                    created_at = post.get("createdAt") or ""
+                    ts_str = str(ts_raw) if ts_raw is not None else ""
+                    ts_human = format_timestamp(ts_raw, created_at)
+                    post_id = item.get("post_id", "")
+                    author = post.get("author", {}).get("userName", "")
+                    # Build post link - use standard format for better mobile app deep linking
+                    post_link = post.get("postUrl") or post.get("url")
+                    if not post_link and post_id:
+                        if author:
+                            # Standard format triggers iOS/Android Universal Links for X app
+                            post_link = f"https://x.com/{author}/status/{post_id}"
+                        else:
+                            post_link = f"https://x.com/i/web/status/{post_id}"
 
-                # Extract engagement metrics and author
-                likes = post.get("likes", 0)
-                reposts = post.get("retweetCount", 0)
-                replies = post.get("replyCount", 0)
-                bookmarks = post.get("bookmarkCount", 0)
-                views = post.get("viewCount", 0)
-                author = post.get("author", {}).get("userName", "")
+                    # Extract engagement metrics and author
+                    likes = post.get("likes", 0)
+                    reposts = post.get("retweetCount", 0)
+                    replies = post.get("replyCount", 0)
+                    bookmarks = post.get("bookmarkCount", 0)
+                    views = post.get("viewCount", 0)
+                    author = post.get("author", {}).get("userName", "")
 
-                key = (profile_url, text, ts_str)
-                if key in existing_pairs:
-                    continue
-                rows.append([profile_url, text, ts_human, likes, reposts, replies, bookmarks, views,
-                            author, reply_reco, question_reco, post_link, summary, category, ""])
-            if rows:
-                ws.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
-            print(f"Wrote {len(rows)} rows to output sheet '{output_ws_name}'.")
+                    key = (profile_url, text, ts_str)
+                    if key in existing_pairs:
+                        continue
+                    brain_ctx = item.get("brain_context", "")
+                    notes_count = item.get("brain_total", 0)
+                    rows.append([profile_url, text, ts_human, likes, reposts, replies, bookmarks, views,
+                                 author, reply_reco, question_reco, post_link, summary, category, "",
+                                 brain_ctx, notes_count])
+                if rows:
+                    ws.append_rows(rows, value_input_option="USER_ENTERED", table_range="A1")
+                print(f"Wrote {len(rows)} rows to output sheet '{output_ws_name}'.")
+            else:
+                print(f"No matched posts to write to output sheet '{output_ws_name}'.")
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to write scrape output: {exc}")
 
@@ -1171,6 +1200,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "reply_recommendation": reply_reco,
                         "question_recommendation": question_reco,
                         "post_id": post_id,
+                        "brain_context": item.get("brain_context", ""),
                     })
 
             if queue_items:
