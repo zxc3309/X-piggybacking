@@ -48,11 +48,31 @@
                     {% endif %}
                 </span>
                 <span class="card-status status-{{ item.status }}">{{ item.status }}</span>
+                {% if item.brain_context %}
+                <span class="brain-badge">B</span>
+                {% endif %}
             </div>
             <span class="card-time">{{ item.created_at }}</span>
         </div>
 
-        <div class="post-content truncated">{{ item.post_content }}</div>
+        <div class="post-content truncated" data-raw="{{ item.post_content | e }}">{{ item.post_content }}</div>
+
+        {% if item.bookmarks or item.views %}
+        <div class="engagement-metrics" style="margin: 6px 0;">
+            {% if item.views %}
+            <span class="engagement-metric" title="Views">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                {{ item.views }}
+            </span>
+            {% endif %}
+            {% if item.bookmarks %}
+            <span class="engagement-metric" title="Bookmarks">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                {{ item.bookmarks }}
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
 
         {% if item.original_reply %}
         <div class="reply-preview">

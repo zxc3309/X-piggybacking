@@ -1250,6 +1250,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "question_recommendation": question_reco,
                         "post_id": post_id,
                         "brain_context": item.get("brain_context", ""),
+                        "bookmarks": post.get("bookmarkCount", 0),
+                        "views": post.get("viewCount", 0),
                     })
 
             if queue_items:

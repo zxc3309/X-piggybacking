@@ -156,6 +156,7 @@ Google Sheets (Researcher)
 - `original_reply`, `edited_reply`
 - `status` (pending/approved/rejected/sent/failed)
 - `approved_at`, `sent_at`, `error_message`
+- `bookmarks`, `views` - Post engagement metrics from X
 
 ## Environment Variables
 

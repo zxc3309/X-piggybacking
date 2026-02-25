@@ -38,6 +38,9 @@ REPLY_QUEUE_HEADERS = [
     "approved_at",
     "sent_at",
     "error_message",
+    "brain_context",
+    "bookmarks",
+    "views",
 ]
 
 VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed"}
@@ -160,6 +163,9 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
             "",           # approved_at
             "",           # sent_at
             "",           # error_message
+            item.get("brain_context", ""),  # brain_context
+            str(item.get("bookmarks", "")),
+            str(item.get("views", "")),
         ])
 
     if rows:

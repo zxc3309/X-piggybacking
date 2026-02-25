@@ -22,6 +22,8 @@
             --red-hover: #d44040;
             --yellow: #f0c060;
             --orange: #f0844a;
+            --brain: #4a9ead;
+            --brain-surface: #141c1e;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,7 +36,7 @@
         }
 
         .container {
-            max-width: 960px;
+            max-width: 1120px;
             margin: 0 auto;
             padding: 0 16px;
         }
@@ -462,13 +464,107 @@
             padding: 6px 0;
         }
 
+        /* ── Post content rich rendering ── */
+        .post-content { white-space: pre-wrap; line-height: 1.7; font-size: 15px; }
+        .post-mention { color: var(--accent); text-decoration: none; }
+        .post-mention:hover { text-decoration: underline; }
+        .post-hashtag { color: var(--accent); opacity: 0.8; }
+        .post-cashtag { color: var(--green); font-weight: 600; }
+        .post-link { color: var(--accent); text-decoration: underline; text-decoration-style: dotted; }
+        .post-link:hover { text-decoration-style: solid; }
+
+        /* ── Brain context panel ── */
+        .brain-panel {
+            background: var(--brain-surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--brain);
+            border-radius: 2px;
+            padding: 16px;
+        }
+        .brain-panel .section-label { color: var(--brain); }
+        .brain-panel h2, .brain-panel h3 {
+            font-family: 'Syne', sans-serif;
+            color: var(--text);
+            margin: 16px 0 8px;
+        }
+        .brain-panel h2 { font-size: 15px; font-weight: 700; }
+        .brain-panel h2:first-child { margin-top: 0; }
+        .brain-panel h3 { font-size: 13px; font-weight: 700; }
+        .brain-panel strong { color: var(--text); font-weight: 600; }
+        .brain-panel ul {
+            list-style: none;
+            padding-left: 0;
+            margin: 6px 0;
+        }
+        .brain-panel li {
+            position: relative;
+            padding-left: 16px;
+            margin: 4px 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .brain-panel li::before {
+            content: '·';
+            position: absolute;
+            left: 4px;
+            color: var(--brain);
+            font-weight: 700;
+        }
+        .brain-panel p {
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            margin: 6px 0;
+        }
+        .note-pill {
+            display: inline;
+            background: rgba(74, 158, 173, 0.15);
+            color: var(--brain);
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* ── Engagement metrics ── */
+        .engagement-metrics {
+            display: flex;
+            gap: 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .engagement-metric {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .engagement-metric svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* ── Brain badge (queue cards) ── */
+        .brain-badge {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--brain);
+            border: 1px solid var(--brain);
+            padding: 1px 5px;
+            border-radius: 2px;
+            letter-spacing: 0.5px;
+            flex-shrink: 0;
+        }
+
         /* ── Review page two-column layout ── */
         .review-layout {
             display: grid;
-            grid-template-columns: 55fr 45fr;
+            grid-template-columns: 1fr 1fr;
             gap: 24px;
             align-items: start;
-            padding: 8px 0 40px;
+            padding: 8px 0 0;
         }
         .review-left {
             position: sticky;
@@ -481,6 +577,13 @@
         .review-left::-webkit-scrollbar { width: 4px; }
         .review-left::-webkit-scrollbar-thumb { background: var(--border); }
 
+        /* ── Reply composer (full width below grid) ── */
+        .reply-composer {
+            border-top: 1px solid var(--border);
+            padding: 20px 0 32px;
+            margin-top: 8px;
+        }
+
         /* ── Responsive ── */
         @media (max-width: 768px) {
             .review-layout {
@@ -490,6 +593,15 @@
                 position: static;
                 max-height: none;
                 overflow-y: visible;
+            }
+            .reply-composer {
+                position: sticky;
+                bottom: 0;
+                background: var(--bg);
+                padding: 12px 0 16px;
+                margin-top: 0;
+                z-index: 50;
+                border-top: 1px solid var(--border);
             }
         }
         @media (max-width: 480px) {
@@ -646,6 +758,76 @@
                 return { success: false, error: err.message };
             }
         }
+    </script>
+    <script>
+        // Post content renderer: linkify URLs, @mentions, #hashtags, $cashtags
+        function renderPostContent(text) {
+            if (!text) return '';
+            // Escape HTML first
+            let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // URLs → clickable short links
+            html = html.replace(/(https?:\/\/[^\s<]+)/g, function(url) {
+                try {
+                    const domain = new URL(url).hostname.replace('www.', '');
+                    return '<a class="post-link" href="' + url + '" target="_blank" rel="noopener">' + domain + '</a>';
+                } catch(e) {
+                    return '<a class="post-link" href="' + url + '" target="_blank" rel="noopener">' + url + '</a>';
+                }
+            });
+            // @mentions
+            html = html.replace(/@(\w{1,15})/g, '<a class="post-mention" href="https://x.com/$1" target="_blank" rel="noopener">@$1</a>');
+            // $cashtags (before hashtags to avoid conflict)
+            html = html.replace(/\$([A-Za-z]{1,10})\b/g, '<span class="post-cashtag">$$$1</span>');
+            // #hashtags
+            html = html.replace(/#(\w+)/g, '<span class="post-hashtag">#$1</span>');
+            return html;
+        }
+
+        // Simple markdown renderer for brain context
+        function renderBrainMarkdown(text) {
+            if (!text) return '';
+            let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            // [[note name]] → pill badge
+            html = html.replace(/\[\[([^\]]+)\]\]/g, '<span class="note-pill">$1</span>');
+            // ### heading
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            // ## heading
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            // **bold**
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            // *italic*
+            html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            // Bullet lists: convert consecutive lines starting with - into <ul>
+            html = html.replace(/(^|\n)(- .+(?:\n- .+)*)/g, function(match, prefix, block) {
+                const items = block.split('\n').map(function(line) {
+                    return '<li>' + line.replace(/^- /, '') + '</li>';
+                }).join('');
+                return prefix + '<ul>' + items + '</ul>';
+            });
+            // Wrap remaining plain lines in <p> (skip empty lines and already-wrapped tags)
+            const lines = html.split('\n');
+            const result = [];
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) { result.push(''); continue; }
+                if (line.startsWith('<h') || line.startsWith('<ul') || line.startsWith('<li') || line.startsWith('<p')) {
+                    result.push(line);
+                } else {
+                    result.push('<p>' + line + '</p>');
+                }
+            }
+            return result.join('\n');
+        }
+
+        // Apply renderPostContent to all .post-content elements on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.post-content[data-raw]').forEach(function(el) {
+                el.innerHTML = renderPostContent(el.dataset.raw);
+            });
+            document.querySelectorAll('.brain-content[data-raw]').forEach(function(el) {
+                el.innerHTML = renderBrainMarkdown(el.dataset.raw);
+            });
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>

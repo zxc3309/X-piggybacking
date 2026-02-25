@@ -27,15 +27,18 @@
         @{{ item.author }}
     </span>
     {% endif %}
+    {% if item.brain_context %}
+    <span class="brain-badge">B</span>
+    {% endif %}
     {% if item.error_message %}
     <div class="error-msg" style="margin: 0; flex: 1;">{{ item.error_message }}</div>
     {% endif %}
 </div>
 
-<!-- Two-column layout -->
+<!-- Two-column layout: Left (post + suggestions) | Right (brain context) -->
 <div class="review-layout">
 
-    <!-- ── Left column: Original post + AI suggestions (sticky) ── -->
+    <!-- Left column: Original post + AI suggestions (sticky) -->
     <div class="review-left">
 
         <!-- Original post -->
@@ -54,7 +57,23 @@
                     <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
                     {% endif %}
                 </div>
-                <div class="post-content">{{ item.post_content }}</div>
+                <div class="post-content" data-raw="{{ item.post_content | e }}">{{ item.post_content }}</div>
+                {% if item.bookmarks or item.views %}
+                <div class="engagement-metrics" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+                    {% if item.views %}
+                    <span class="engagement-metric" title="Views">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        {{ item.views }}
+                    </span>
+                    {% endif %}
+                    {% if item.bookmarks %}
+                    <span class="engagement-metric" title="Bookmarks">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                        {{ item.bookmarks }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -67,7 +86,7 @@
                 <div class="suggestion-box">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <span class="suggestion-label">// Reply</span>
-                        <button class="copy-btn" onclick="copyReplyToEditor()">Use this ↓</button>
+                        <button class="copy-btn" onclick="useReply()">Use this ↓</button>
                     </div>
                     <div class="reply-preview" id="ai-reply">{{ item.original_reply }}</div>
                     <div class="char-counter">{{ item.original_reply | length }} / 280</div>
@@ -78,7 +97,7 @@
                 <div class="suggestion-box" style="border-left-color: var(--yellow);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <span class="suggestion-label">// Question</span>
-                        <button class="copy-btn" style="color: var(--yellow); border-color: var(--border);" onclick="copyQuestionToEditor()">Use this ↓</button>
+                        <button class="copy-btn" style="color: var(--yellow); border-color: var(--border);" onclick="useQuestion()">Use this ↓</button>
                     </div>
                     <div class="reply-preview" id="ai-question" style="border-left-color: var(--yellow);">{{ item.original_question }}</div>
                     <div class="char-counter">{{ item.original_question | length }} / 280</div>
@@ -90,65 +109,82 @@
 
     </div><!-- /review-left -->
 
-    <!-- ── Right column: Edit + Actions + Audit ── -->
+    <!-- Right column: Brain Context -->
     <div class="review-right">
-
-        <div id="review-form">
-            <div class="section" style="margin-top: 0;">
-                <div class="section-label">Your Reply</div>
-                <textarea
-                    class="edit-area"
-                    id="edited-reply"
-                    name="edited_reply"
-                    placeholder="Edit the reply here, or leave empty to use AI suggestion..."
-                    maxlength="500"
-                >{{ item.edited_reply }}</textarea>
-
-                <!-- Char progress bar -->
-                <div class="char-bar-wrap">
-                    <div class="char-bar-track">
-                        <div class="char-bar-fill" id="char-bar-fill"></div>
-                    </div>
-                    <div class="char-bar-label" id="char-counter">
-                        <span id="char-count">{{ item.edited_reply | length }}</span> / 280
-                    </div>
-                </div>
-            </div>
-
-            <!-- Action buttons -->
-            <div class="card-actions" style="margin: 20px 0; justify-content: space-between;">
-                <div>
-                    <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
-                    <button type="button" id="approve-btn" class="btn btn-approve">Approve &amp; Send</button>
-                </div>
+        {% if item.brain_context %}
+        <div class="section" style="margin-top: 0;">
+            <div class="section-label" style="color: var(--brain);">Second Brain Analysis</div>
+            <div class="brain-panel">
+                <div class="brain-content" data-raw="{{ item.brain_context | e }}">{{ item.brain_context }}</div>
             </div>
         </div>
+        {% else %}
+        <div class="section" style="margin-top: 0;">
+            <div class="section-label" style="color: var(--text-secondary);">Second Brain</div>
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 13px; border: 1px dashed var(--border); border-radius: 2px;">
+                No related notes found for this post.
+            </div>
+        </div>
+        {% endif %}
 
-        <!-- Audit trail -->
-        <div class="section" style="padding-bottom: 32px;">
-            <div class="section-label">Audit Trail</div>
-            <table class="audit-table">
-                <tr>
-                    <td class="audit-key">Created</td>
-                    <td class="audit-val">{{ item.created_at or "—" }}</td>
-                </tr>
-                <tr>
-                    <td class="audit-key">Approved</td>
-                    <td class="audit-val">{{ item.approved_at or "—" }}</td>
-                </tr>
-                <tr>
-                    <td class="audit-key">Sent</td>
-                    <td class="audit-val">{{ item.sent_at or "—" }}</td>
-                </tr>
-            </table>
+        <!-- Audit trail (collapsed) -->
+        <div class="section">
+            <details>
+                <summary style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; cursor: pointer; user-select: none;">Audit Trail</summary>
+                <table class="audit-table" style="margin-top: 10px;">
+                    <tr>
+                        <td class="audit-key">Created</td>
+                        <td class="audit-val">{{ item.created_at or "—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="audit-key">Approved</td>
+                        <td class="audit-val">{{ item.approved_at or "—" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="audit-key">Sent</td>
+                        <td class="audit-val">{{ item.sent_at or "—" }}</td>
+                    </tr>
+                </table>
+            </details>
         </div>
 
     </div><!-- /review-right -->
 
 </div><!-- /review-layout -->
+
+<!-- Reply Composer (full width, bottom) -->
+<div class="reply-composer" id="reply-composer">
+    <div class="section-label">Your Reply</div>
+    <textarea
+        class="edit-area"
+        id="edited-reply"
+        name="edited_reply"
+        placeholder="Edit the reply here, or leave empty to use AI suggestion..."
+        maxlength="500"
+    >{{ item.edited_reply }}</textarea>
+
+    <!-- Char progress bar -->
+    <div class="char-bar-wrap">
+        <div class="char-bar-track">
+            <div class="char-bar-fill" id="char-bar-fill"></div>
+        </div>
+        <div class="char-bar-label" id="char-counter">
+            <span id="char-count">{{ item.edited_reply | length }}</span> / 280
+        </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="card-actions" style="margin: 16px 0 0; justify-content: space-between;">
+        <div>
+            <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
+            <button type="button" id="approve-btn" class="btn btn-approve">Approve &amp; Send</button>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -180,39 +216,41 @@
 
     textarea.addEventListener('input', updateCounter);
 
-    // If textarea is empty, count the AI reply length instead
+    // If textarea is empty, show 0 count
     if (!textarea.value.trim()) {
-        const aiReplyLen = document.getElementById('ai-reply').textContent.trim().length;
         counter.textContent = '0';
     }
 
-    function copyReplyToEditor() {
-        const aiText = document.getElementById('ai-reply').textContent.trim();
-        textarea.value = aiText;
-        updateCounter();
+    function scrollToComposer() {
+        document.getElementById('reply-composer').scrollIntoView({ behavior: 'smooth', block: 'center' });
         textarea.focus();
     }
 
-    function copyQuestionToEditor() {
+    function useReply() {
+        const aiText = document.getElementById('ai-reply').textContent.trim();
+        textarea.value = aiText;
+        updateCounter();
+        scrollToComposer();
+    }
+
+    function useQuestion() {
         const questionEl = document.getElementById('ai-question');
         if (questionEl) {
-            const questionText = questionEl.textContent.trim();
-            textarea.value = questionText;
+            textarea.value = questionEl.textContent.trim();
             updateCounter();
-            textarea.focus();
+            scrollToComposer();
         }
     }
 
-    // Keep legacy function for backwards compatibility
-    function copyToEditor() {
-        copyReplyToEditor();
-    }
+    // Legacy compatibility
+    function copyReplyToEditor() { useReply(); }
+    function copyQuestionToEditor() { useQuestion(); }
+    function copyToEditor() { useReply(); }
 
     // AJAX action handlers
     document.getElementById('approve-btn').addEventListener('click', async function() {
         const btn = this;
         const text = textarea.value.trim();
-        // If textarea is empty, the original AI reply will be used
         const aiText = document.getElementById('ai-reply').textContent.trim();
         const replyText = text || aiText;
 
@@ -223,7 +261,6 @@
 
         const result = await approveItem(QUEUE_ID, text, btn);
         if (result.success) {
-            // Redirect back to queue after short delay
             setTimeout(() => {
                 window.location.href = `${API_PREFIX}/review?status=pending`;
             }, 500);
@@ -234,7 +271,6 @@
         const btn = this;
         const result = await rejectItem(QUEUE_ID, btn);
         if (result.success) {
-            // Redirect back to queue after short delay
             setTimeout(() => {
                 window.location.href = `${API_PREFIX}/review?status=pending`;
             }, 500);
@@ -245,6 +281,24 @@
         const btn = this;
         const text = textarea.value.trim();
         await saveItem(QUEUE_ID, text, btn);
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Cmd+Enter or Ctrl+Enter = Approve & Send
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('approve-btn').click();
+        }
+        // Cmd+S or Ctrl+S = Save Draft
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            document.getElementById('save-btn').click();
+        }
+        // Esc = Back to queue
+        if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey) {
+            window.location.href = `${API_PREFIX}/review?status=pending`;
+        }
     });
 
     updateCounter();

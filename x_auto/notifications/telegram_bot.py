@@ -86,7 +86,12 @@ async def _send_message_async(bot_token: str, chat_id: str, message: str, parse_
         return False
 
 
-def send_telegram_message(message: str, parse_mode: str = ParseMode.MARKDOWN) -> bool:
+def escape_html(text: str) -> str:
+    """Escape special HTML characters."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def send_telegram_message(message: str, parse_mode: str = ParseMode.HTML) -> bool:
     """
     Send a message to the configured Telegram chat.
 
@@ -136,8 +141,8 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
     total_count = len(posts)
 
     message_parts = [
-        "🚨 *Daily Crypto Intelligence Summary*",
-        f"📅 {today} \\- {total_count} posts",
+        "🚨 <b>Daily Crypto Intelligence Summary</b>",
+        f"📅 {today} - {total_count} posts",
         ""
     ]
 
@@ -155,32 +160,12 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
         display_name = CATEGORY_DISPLAY_NAMES.get(category, category.replace("_", " ").title())
         count = len(posts_in_category)
 
-        message_parts.append(f"{emoji} *{display_name}* ({count})")
+        message_parts.append(f"{emoji} <b>{display_name}</b> ({count})")
 
         # Add each post as a markdown link
         for post in posts_in_category:
             summary = post.get("summary", "Untitled post")
-            # Escape markdown special characters in summary
-            summary_escaped = (
-                summary.replace("_", "\\_")
-                .replace("*", "\\*")
-                .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replace("(", "\\(")
-                .replace(")", "\\)")
-                .replace("~", "\\~")
-                .replace("`", "\\`")
-                .replace(">", "\\>")
-                .replace("#", "\\#")
-                .replace("+", "\\+")
-                .replace("-", "\\-")
-                .replace("=", "\\=")
-                .replace("|", "\\|")
-                .replace("{", "\\{")
-                .replace("}", "\\}")
-                .replace(".", "\\.")
-                .replace("!", "\\!")
-            )
+            summary_escaped = escape_html(summary)
 
             post_link = post.get("post_link", "")
             if not post_link:
@@ -197,7 +182,7 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
                         post_link = f"https://x.com/i/web/status/{post_id}"
 
             if post_link:
-                message_parts.append(f"→ [{summary_escaped}]({post_link})")
+                message_parts.append(f'→ <a href="{post_link}">{summary_escaped}</a>')
             else:
                 message_parts.append(f"→ {summary_escaped}")
 
@@ -208,13 +193,13 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
     if dashboard_url:
         pending_count = len(posts)
         message_parts.append(
-            f"📝 [{pending_count} replies pending review]({dashboard_url}/review?status=pending)"
+            f'📝 <a href="{dashboard_url}/review?status=pending">{pending_count} replies pending review</a>'
         )
         message_parts.append("")
 
     # Add footer
-    message_parts.append("\\-\\-\\-")
-    message_parts.append("_Powered by X\\-Piggybacking Analyzer_")
+    message_parts.append("---")
+    message_parts.append("<i>Powered by X-Piggybacking Analyzer</i>")
 
     return "\n".join(message_parts)
 
@@ -282,11 +267,11 @@ def send_daily_summary(matched_posts: List[Dict[str, Any]]) -> bool:
         # Handle case: no matched posts
         if not matched_posts or len(matched_posts) == 0:
             no_posts_message = (
-                "🚨 *Daily Crypto Intelligence Summary*\n"
+                "🚨 <b>Daily Crypto Intelligence Summary</b>\n"
                 f"📅 {datetime.now(timezone.utc).strftime('%Y-%m-%d')}\n\n"
-                "ℹ️ No matching posts found today\\.\n\n"
-                "\\-\\-\\-\n"
-                "_Powered by X\\-Piggybacking Analyzer_"
+                "ℹ️ No matching posts found today.\n\n"
+                "---\n"
+                "<i>Powered by X-Piggybacking Analyzer</i>"
             )
             return send_telegram_message(no_posts_message)
 
