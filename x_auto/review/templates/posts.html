@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+{% block title %}Scraped Posts — Signal Feed{% endblock %}
+
+{% block header_right %}
+<div style="display: flex; align-items: center; gap: 16px;">
+    <a class="btn btn-link btn-sm" href="{{ prefix }}/review" style="font-size: 11px;">Queue &rarr;</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats banner -->
+<div class="signal-stats">
+    <div class="stat-cell">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-key">total</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-cell">
+        <span class="stat-value" style="color: var(--green);">{{ stats.matched }}</span>
+        <span class="stat-key">matched</span>
+    </div>
+    <div class="stat-divider"></div>
+    <div class="stat-cell">
+        <span class="stat-value">{{ stats.match_rate }}%</span>
+        <span class="stat-key">hit rate</span>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="signal-filters">
+    <div class="filter-row">
+        <!-- Author filter -->
+        <select id="author-filter" class="filter-select" onchange="filterByAuthor(this.value)">
+            <option value="">All authors ({{ authors | length }})</option>
+            {% for a in authors %}
+            <option value="{{ a }}" {% if current_author == a %}selected{% endif %}>@{{ a }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Decision filter (client-side) -->
+        <div class="filter-pills">
+            <button class="pill active" data-filter="all" onclick="filterByDecision('all', this)">All</button>
+            <button class="pill" data-filter="matched" onclick="filterByDecision('matched', this)">Matched</button>
+            <button class="pill" data-filter="rejected" onclick="filterByDecision('rejected', this)">Rejected</button>
+        </div>
+
+        <!-- Search -->
+        <input type="text" id="search-input" class="filter-search" placeholder="Search posts..." oninput="filterBySearch(this.value)">
+    </div>
+</div>
+
+<!-- Posts list -->
+<div id="posts-list">
+{% if items %}
+    {% for item in items | reverse %}
+    {% set decision = item.llm_decision | lower %}
+    {% set is_matched = decision in ['yes', '1'] %}
+    <div class="signal-card {% if is_matched %}signal-matched{% else %}signal-rejected{% endif %}"
+         data-decision="{% if is_matched %}matched{% else %}rejected{% endif %}"
+         data-content="{{ item.post_content | lower | e }}">
+
+        <!-- Row 1: Meta line -->
+        <div class="signal-meta">
+            <div class="signal-meta-left">
+                <a class="signal-author" href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                <span class="signal-dot">&middot;</span>
+                <span class="signal-time">{{ item.timestamp }}</span>
+                <span class="signal-dot">&middot;</span>
+                <span class="signal-decision {% if is_matched %}decision-yes{% else %}decision-no{% endif %}">
+                    {% if is_matched %}MATCH{% else %}SKIP{% endif %}
+                </span>
+            </div>
+            {% if item.post_link %}
+            <a class="signal-ext" href="{{ item.post_link }}" target="_blank" rel="noopener">&nearr;</a>
+            {% endif %}
+        </div>
+
+        <!-- Row 2: Content -->
+        <div class="signal-body post-content" data-raw="{{ item.post_content | e }}">{{ item.post_content }}</div>
+
+        <!-- Row 3: Engagement bar -->
+        <div class="signal-engagement">
+            {% if item.views %}
+            <span class="eng" title="Views">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                {{ item.views }}
+            </span>
+            {% endif %}
+            {% if item.likes %}
+            <span class="eng" title="Likes">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                {{ item.likes }}
+            </span>
+            {% endif %}
+            {% if item.reposts %}
+            <span class="eng" title="Reposts">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                {{ item.reposts }}
+            </span>
+            {% endif %}
+            {% if item.replies %}
+            <span class="eng" title="Replies">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                {{ item.replies }}
+            </span>
+            {% endif %}
+            {% if item.bookmarks %}
+            <span class="eng" title="Bookmarks">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                {{ item.bookmarks }}
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Row 4: LLM Reason (collapsed) -->
+        {% if item.llm_reason %}
+        <details class="signal-reason-wrap">
+            <summary class="signal-reason-toggle">AI reasoning</summary>
+            <div class="signal-reason">{{ item.llm_reason }}</div>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">[ --- ]</div>
+        <h2>No posts found{% if current_author %} for @{{ current_author }}{% endif %}</h2>
+        <p>Posts will appear here after the scraper runs.</p>
+    </div>
+{% endif %}
+</div>
+
+<div id="no-results" style="display: none;" class="empty-state">
+    <div class="empty-state-icon">[ ... ]</div>
+    <h2>No matching posts</h2>
+    <p>Try adjusting your filters.</p>
+</div>
+
+<style>
+    /* ── Stats banner ── */
+    .signal-stats {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        padding: 18px 0;
+        border-bottom: 1px solid var(--border);
+    }
+    .stat-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1;
+    }
+    .stat-value {
+        font-family: 'Syne', sans-serif;
+        font-size: 28px;
+        font-weight: 800;
+        color: var(--text);
+        letter-spacing: -1px;
+        line-height: 1;
+    }
+    .stat-key {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--text-secondary);
+        margin-top: 4px;
+    }
+    .stat-divider {
+        width: 1px;
+        height: 32px;
+        background: var(--border);
+    }
+
+    /* ── Filters ── */
+    .signal-filters {
+        padding: 14px 0;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 4px;
+    }
+    .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .filter-select {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 2px;
+        cursor: pointer;
+        min-width: 180px;
+    }
+    .filter-select:focus { outline: none; border-color: var(--accent); }
+    .filter-select option { background: var(--surface); color: var(--text); }
+
+    .filter-pills {
+        display: flex;
+        gap: 0;
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        overflow: hidden;
+    }
+    .pill {
+        background: transparent;
+        border: none;
+        border-right: 1px solid var(--border);
+        color: var(--text-secondary);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 6px 14px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+        letter-spacing: 0.03em;
+    }
+    .pill:last-child { border-right: none; }
+    .pill:hover { color: var(--text); background: var(--surface-2); }
+    .pill.active { background: var(--accent); color: #0d0c0b; font-weight: 700; }
+
+    .filter-search {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        padding: 6px 12px;
+        border-radius: 2px;
+        flex: 1;
+        min-width: 140px;
+    }
+    .filter-search:focus { outline: none; border-color: var(--accent); }
+    .filter-search::placeholder { color: var(--text-secondary); opacity: 0.6; }
+
+    /* ── Signal cards ── */
+    .signal-card {
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--border);
+        border-radius: 2px;
+        padding: 14px 16px;
+        margin: 8px 0;
+        background: var(--surface);
+        transition: border-color 0.15s;
+    }
+    .signal-card:hover {
+        border-color: var(--text-secondary);
+        border-left-color: var(--text-secondary);
+    }
+    .signal-matched { border-left-color: var(--green); }
+    .signal-matched:hover { border-left-color: var(--green); }
+    .signal-rejected { opacity: 0.65; }
+    .signal-rejected:hover { opacity: 1; }
+
+    /* Meta line */
+    .signal-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+    .signal-meta-left {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+    .signal-author {
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--accent);
+        text-decoration: none;
+    }
+    .signal-author:hover { text-decoration: underline; }
+    .signal-dot { color: var(--text-secondary); font-size: 10px; }
+    .signal-time { font-size: 12px; color: var(--text-secondary); }
+    .signal-decision {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 8px;
+        border-radius: 2px;
+        letter-spacing: 1.5px;
+        border: 1px solid currentColor;
+    }
+    .decision-yes { color: var(--green); }
+    .decision-no { color: var(--text-secondary); }
+    .signal-ext {
+        font-size: 16px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        padding: 2px 6px;
+        transition: color 0.15s;
+    }
+    .signal-ext:hover { color: var(--accent); }
+
+    /* Body */
+    .signal-body {
+        font-size: 14px;
+        line-height: 1.65;
+        color: var(--text);
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    /* Engagement bar */
+    .signal-engagement {
+        display: flex;
+        gap: 14px;
+        font-size: 12px;
+        color: var(--text-secondary);
+    }
+    .eng {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* LLM Reason */
+    .signal-reason-wrap {
+        margin-top: 8px;
+    }
+    .signal-reason-toggle {
+        font-size: 11px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        user-select: none;
+        letter-spacing: 0.5px;
+    }
+    .signal-reason-toggle:hover { color: var(--accent); }
+    .signal-reason {
+        font-size: 12px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin-top: 6px;
+        padding: 8px 12px;
+        background: var(--surface-2);
+        border-radius: 2px;
+        border-left: 2px solid var(--border);
+    }
+
+    @media (max-width: 600px) {
+        .filter-row { flex-direction: column; align-items: stretch; }
+        .filter-select, .filter-search { min-width: 0; width: 100%; }
+        .signal-engagement { flex-wrap: wrap; gap: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let activeDecision = 'all';
+    let activeSearch = '';
+
+    function filterByAuthor(author) {
+        const prefix = '{{ prefix }}';
+        if (author) {
+            window.location.href = prefix + '/posts?author=' + encodeURIComponent(author);
+        } else {
+            window.location.href = prefix + '/posts';
+        }
+    }
+
+    function filterByDecision(decision, btn) {
+        activeDecision = decision;
+        document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        applyFilters();
+    }
+
+    function filterBySearch(query) {
+        activeSearch = query.toLowerCase().trim();
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const cards = document.querySelectorAll('.signal-card');
+        let visible = 0;
+
+        cards.forEach(card => {
+            let show = true;
+
+            // Decision filter
+            if (activeDecision !== 'all') {
+                const cardDecision = card.dataset.decision;
+                if (cardDecision !== activeDecision) show = false;
+            }
+
+            // Search filter
+            if (activeSearch && show) {
+                const content = card.dataset.content || '';
+                if (!content.includes(activeSearch)) show = false;
+            }
+
+            card.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+
+        // Show/hide empty state
+        document.getElementById('no-results').style.display = visible === 0 ? '' : 'none';
+        document.getElementById('posts-list').style.display = visible === 0 ? 'none' : '';
+    }
+</script>
+{% endblock %}

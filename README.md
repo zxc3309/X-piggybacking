@@ -249,6 +249,8 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/posts` | GET | Scraped posts feed (all_post sheet) |
+| `/posts?author=xxx` | GET | Filter posts by author |
 | `/review` | GET | List all pending replies |
 | `/review?status=approved` | GET | Filter by status |
 | `/review/{queue_id}` | GET | Detail view for editing |

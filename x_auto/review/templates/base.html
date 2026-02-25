@@ -75,6 +75,17 @@
             font-size: 14px;
         }
         .header h1 a:hover { color: var(--accent); }
+        .nav-pill {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 4px 10px;
+            border-radius: 2px;
+            letter-spacing: 0.5px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .nav-pill:hover { color: var(--text); background: var(--surface-2); }
 
         /* ── Quota — progress bar ── */
         .quota-badge {
@@ -614,6 +625,10 @@
     <header class="header">
         <div class="container header-inner">
             <h1><a href="{{ prefix }}/review">Reply Review</a></h1>
+            <nav style="display: flex; gap: 4px; margin-left: 16px;">
+                <a class="nav-pill" href="{{ prefix }}/review">Queue</a>
+                <a class="nav-pill" href="{{ prefix }}/posts">Posts</a>
+            </nav>
             {% block header_right %}{% endblock %}
         </div>
     </header>
