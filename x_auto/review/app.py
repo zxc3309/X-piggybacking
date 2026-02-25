@@ -18,16 +18,13 @@ Endpoints:
 from __future__ import annotations
 
 import os
-import time
 import logging
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-
 from x_auto.review import queue_manager
 
 logger = logging.getLogger(__name__)
@@ -107,88 +104,13 @@ async def review_detail(request: Request, queue_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Scraped Posts
-# ---------------------------------------------------------------------------
-
-# Cache for all_post data
-_posts_cache: Dict[str, Any] = {"items": None, "timestamp": 0.0}
-_POSTS_CACHE_TTL = 60  # seconds
-
-
-def _load_all_posts() -> List[Dict[str, Any]]:
-    """Load all posts from the all_post worksheet with caching."""
-    now = time.monotonic()
-    if _posts_cache["items"] is not None and (now - _posts_cache["timestamp"]) < _POSTS_CACHE_TTL:
-        return _posts_cache["items"]
-
-    from x_auto.sheets.client import GoogleSheetsClient
-
-    sheet_id = os.getenv("GOOGLE_SHEET_ID")
-    ws_name = os.getenv("GOOGLE_WS_ALL_POST", "all_post")
-    client = GoogleSheetsClient(spreadsheet_name="all_post", spreadsheet_id=sheet_id)
-    ws = client.get_sheet(ws_name)
-    rows = ws.get_all_values()
-
-    if len(rows) <= 1:
-        _posts_cache["items"] = []
-        _posts_cache["timestamp"] = now
-        return []
-
-    headers = rows[0]
-    items = []
-    for row in rows[1:]:
-        item = {}
-        for col_idx, header in enumerate(headers):
-            item[header] = row[col_idx] if col_idx < len(row) else ""
-        items.append(item)
-
-    _posts_cache["items"] = items
-    _posts_cache["timestamp"] = now
-    return items
-
-
-@app.get("/posts", response_class=HTMLResponse)
-async def posts_page(request: Request, author: Optional[str] = None):
-    """Show all scraped posts, optionally filtered by author."""
-    try:
-        items = _load_all_posts()
-    except Exception as e:
-        logger.error(f"Failed to load posts: {e}", exc_info=True)
-        items = []
-
-    # Collect unique authors
-    authors = sorted(set(item.get("author", "") for item in items if item.get("author")))
-
-    # Filter by author if specified
-    if author:
-        items = [item for item in items if item.get("author") == author]
-
-    # Calculate stats
-    total = len(items)
-    matched = sum(1 for item in items if item.get("llm_decision", "").lower() in ("yes", "1"))
-    match_rate = round((matched / total * 100), 1) if total > 0 else 0
-
-    return templates.TemplateResponse("posts.html", {
-        "request": request,
-        "items": items,
-        "authors": authors,
-        "current_author": author,
-        "stats": {"total": total, "matched": matched, "match_rate": match_rate},
-        "prefix": _prefix(request),
-    })
-
-
-# ---------------------------------------------------------------------------
 # Actions
 # ---------------------------------------------------------------------------
 
 @app.post("/review/{queue_id}/approve")
 async def approve(request: Request, queue_id: str, edited_reply: str = Form("")):
     """Approve a reply, optionally with edited text."""
-    # Validate character count
     reply_text = edited_reply.strip()
-    if len(reply_text) > 280:
-        raise HTTPException(status_code=400, detail="Reply exceeds 280 characters")
 
     try:
         success = queue_manager.approve_item(queue_id, edited_reply=reply_text)
@@ -259,13 +181,6 @@ async def api_approve(request: Request, queue_id: str):
         data = {}
 
     edited_reply = (data.get("edited_reply") or "").strip()
-
-    # Validate character count
-    if len(edited_reply) > 280:
-        return JSONResponse(
-            {"success": False, "error": "Reply exceeds 280 characters"},
-            status_code=400
-        )
 
     try:
         success = queue_manager.approve_item(queue_id, edited_reply=edited_reply)

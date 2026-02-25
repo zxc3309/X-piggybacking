@@ -283,9 +283,14 @@ def send_daily_summary(matched_posts: List[Dict[str, Any]]) -> bool:
 
         # Send all parts
         all_success = True
+        dashboard_url = os.getenv("REVIEW_DASHBOARD_URL", "")
         for idx, part in enumerate(message_parts, 1):
             if len(message_parts) > 1:
                 logger.info(f"Sending part {idx}/{len(message_parts)} to Telegram")
+
+            # Append dashboard link to every part if not already present
+            if dashboard_url and dashboard_url not in part:
+                part += f'\n\n📋 <a href="{dashboard_url}/review?status=pending">Open Dashboard</a>'
 
             success = send_telegram_message(part)
             if not success:

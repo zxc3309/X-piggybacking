@@ -1229,7 +1229,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
             queue_items = []
             for item in matched_with_profile:
                 post = item["post"]
-                text = (post.get("text") or post.get("postText") or "").replace("\n", " ").strip()
+                text = (post.get("text") or post.get("postText") or "").strip()
                 author = post.get("author", {}).get("userName", "")
                 post_id = item.get("post_id", "")
                 post_link = post.get("postUrl") or post.get("url") or ""

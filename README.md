@@ -235,7 +235,7 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 1. **Daily scrape** generates reply candidates → stored in `reply_queue` with status `pending`
 2. **Review** each candidate in the dashboard:
    - View original post and generated reply
-   - Edit the reply text (280 char limit enforced)
+   - Edit the reply text
    - **Approve** - marks status as `approved`, queued for auto-sender
    - **Reject** - marks status as `rejected`
    - **Save** - saves edits without changing status
@@ -249,8 +249,6 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/posts` | GET | Scraped posts feed (all_post sheet) |
-| `/posts?author=xxx` | GET | Filter posts by author |
 | `/review` | GET | List all pending replies |
 | `/review?status=approved` | GET | Filter by status |
 | `/review/{queue_id}` | GET | Detail view for editing |
@@ -264,7 +262,7 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 
 ## Telegram Notifications
 
-Posts grouped by category (Token Analysis, Industry Analysis, Market Comment, etc.) with direct links to X posts.
+Posts grouped by category (Token Analysis, Industry Analysis, Market Comment, etc.) with direct links to X posts. Each message part includes a link to the review dashboard.
 
 **Enable:** Set `ENABLE_TELEGRAM_NOTIFICATIONS=true` in `.env`
 

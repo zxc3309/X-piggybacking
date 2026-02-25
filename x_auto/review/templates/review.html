@@ -35,10 +35,10 @@
     {% endif %}
 </div>
 
-<!-- Two-column layout: Left (post + suggestions) | Right (brain context) -->
+<!-- Two-column layout: Left (original post) | Right (AI suggestions + brain context) -->
 <div class="review-layout">
 
-    <!-- Left column: Original post + AI suggestions (sticky) -->
+    <!-- Left column: Original post (sticky) -->
     <div class="review-left">
 
         <!-- Original post -->
@@ -77,8 +77,13 @@
             </div>
         </div>
 
+    </div><!-- /review-left -->
+
+    <!-- Right column: AI Suggestions + Brain Context -->
+    <div class="review-right">
+
         <!-- AI suggestions -->
-        <div class="section">
+        <div class="section" style="margin-top: 0;">
             <div class="section-label">AI Suggestions</div>
             <div style="display: flex; flex-direction: column; gap: 12px;">
 
@@ -89,7 +94,7 @@
                         <button class="copy-btn" onclick="useReply()">Use this ↓</button>
                     </div>
                     <div class="reply-preview" id="ai-reply">{{ item.original_reply }}</div>
-                    <div class="char-counter">{{ item.original_reply | length }} / 280</div>
+                    <div class="char-counter">{{ item.original_reply | length }} chars</div>
                 </div>
 
                 <!-- Question suggestion -->
@@ -100,17 +105,13 @@
                         <button class="copy-btn" style="color: var(--yellow); border-color: var(--border);" onclick="useQuestion()">Use this ↓</button>
                     </div>
                     <div class="reply-preview" id="ai-question" style="border-left-color: var(--yellow);">{{ item.original_question }}</div>
-                    <div class="char-counter">{{ item.original_question | length }} / 280</div>
+                    <div class="char-counter">{{ item.original_question | length }} chars</div>
                 </div>
                 {% endif %}
 
             </div>
         </div>
 
-    </div><!-- /review-left -->
-
-    <!-- Right column: Brain Context -->
-    <div class="review-right">
         {% if item.brain_context %}
         <div class="section" style="margin-top: 0;">
             <div class="section-label" style="color: var(--brain);">Second Brain Analysis</div>
@@ -160,16 +161,12 @@
         id="edited-reply"
         name="edited_reply"
         placeholder="Edit the reply here, or leave empty to use AI suggestion..."
-        maxlength="500"
     >{{ item.edited_reply }}</textarea>
 
-    <!-- Char progress bar -->
+    <!-- Char counter (informational) -->
     <div class="char-bar-wrap">
-        <div class="char-bar-track">
-            <div class="char-bar-fill" id="char-bar-fill"></div>
-        </div>
         <div class="char-bar-label" id="char-counter">
-            <span id="char-count">{{ item.edited_reply | length }}</span> / 280
+            <span id="char-count">{{ item.edited_reply | length }}</span> chars
         </div>
     </div>
 
@@ -191,27 +188,11 @@
 <script>
     const textarea = document.getElementById('edited-reply');
     const counter = document.getElementById('char-count');
-    const counterDiv = document.getElementById('char-counter');
-    const barFill = document.getElementById('char-bar-fill');
-    const MAX_CHARS = 280;
     const QUEUE_ID = '{{ item.queue_id }}';
 
     function updateCounter() {
         const len = textarea.value.length;
         counter.textContent = len;
-        counterDiv.classList.remove('over', 'warn');
-        barFill.classList.remove('over', 'warn');
-
-        const pct = Math.min((len / MAX_CHARS) * 100, 100);
-        barFill.style.width = pct + '%';
-
-        if (len > MAX_CHARS) {
-            counterDiv.classList.add('over');
-            barFill.classList.add('over');
-        } else if (len > MAX_CHARS * 0.9) {
-            counterDiv.classList.add('warn');
-            barFill.classList.add('warn');
-        }
     }
 
     textarea.addEventListener('input', updateCounter);
@@ -251,14 +232,6 @@
     document.getElementById('approve-btn').addEventListener('click', async function() {
         const btn = this;
         const text = textarea.value.trim();
-        const aiText = document.getElementById('ai-reply').textContent.trim();
-        const replyText = text || aiText;
-
-        if (replyText.length > MAX_CHARS) {
-            alert('Reply exceeds 280 characters (' + replyText.length + '). Please shorten it.');
-            return;
-        }
-
         const result = await approveItem(QUEUE_ID, text, btn);
         if (result.success) {
             setTimeout(() => {
