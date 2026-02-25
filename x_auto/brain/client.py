@@ -1,7 +1,6 @@
 """Client for cesecondbrain-api + LLM brain context generation."""
 from __future__ import annotations
 import os
-import re
 from typing import Optional
 import requests
 
@@ -78,15 +77,10 @@ class BrainClient:
         if not self.enabled or not self.base_url or not self.api_key:
             return None
         try:
-            # Sanitize query: only strip punctuation that crashes server-side
-            # tsquery parsing (. , ; : ! ? etc.), keep $@# for token/handle context
-            sanitized = re.sub(r"[.,;:!?\-\—\–\"'`()\[\]{}/\\]", " ", post_text[:500])
-            sanitized = re.sub(r"\s+", " ", sanitized).strip()
-
             resp = requests.post(
                 f"{self.base_url}/search",
                 json={
-                    "query": sanitized,
+                    "query": post_text[:500],
                     "mode": "hybrid",
                     "limit": self.limit,
                     "include_linked": True,
