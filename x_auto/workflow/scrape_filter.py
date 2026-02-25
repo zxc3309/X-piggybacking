@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -390,11 +391,34 @@ def call_chatgpt(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json; charset=utf-8",
     }
-    resp = requests.post("https://api.openai.com/v1/chat/completions", json=body, headers=headers, timeout=30)
-    if not resp.ok:
-        raise RuntimeError(f"ChatGPT API error {resp.status_code}: {resp.text}")
-    data = resp.json()
-    return data["choices"][0]["message"]["content"].strip()
+
+    last_err = None
+    for attempt in range(3):
+        try:
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                json=body, headers=headers, timeout=30,
+            )
+            if resp.status_code == 429:
+                wait = 2 ** attempt * 2  # 2s, 4s, 8s
+                print(f"[ChatGPT] Rate limited (429), waiting {wait}s (attempt {attempt+1}/3)")
+                time.sleep(wait)
+                continue
+            if not resp.ok:
+                raise RuntimeError(f"ChatGPT API error {resp.status_code}: {resp.text}")
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+        except requests.exceptions.Timeout:
+            last_err = f"Timeout after 30s (attempt {attempt+1}/3)"
+            print(f"[ChatGPT] {last_err}")
+            time.sleep(2 ** attempt)
+        except RuntimeError:
+            raise  # re-raise non-retryable errors (non-429 API errors)
+        except Exception as e:
+            last_err = str(e)
+            print(f"[ChatGPT] Error: {last_err} (attempt {attempt+1}/3)")
+            time.sleep(2 ** attempt)
+    raise RuntimeError(f"ChatGPT failed after 3 attempts: {last_err}")
 
 
 def is_match_via_llm(prompt: str, post_text: str) -> bool:
@@ -961,93 +985,107 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         to_merge = filtered_posts if filtered_posts else recent
         merged_recent = merge_threaded_posts(to_merge)
         for post in merged_recent:
-            text = post.get("text") or post.get("postText") or ""
-            is_article, article_url = is_article_post(post)
+            try:
+                text = post.get("text") or post.get("postText") or ""
+                is_article, article_url = is_article_post(post)
 
-            # For any article post (or empty-text post that might be a pure article), fetch content
-            if is_article or not text:
-                article_content, fetched_article_url = get_article_content_for_post(post)
-                if article_content:
-                    is_article = True
-                    if not article_url:
-                        article_url = fetched_article_url
-                    if text:
-                        text = f"{text}\n\n--- Full Article ---\n\n{article_content}"
-                    else:
-                        text = article_content
-                    print(f"   → Fetched article content ({len(article_content)} chars)")
-                elif not text:
-                    continue  # no text and no article content, skip
+                # For any article post (or empty-text post that might be a pure article), fetch content
+                if is_article or not text:
+                    article_content, fetched_article_url = get_article_content_for_post(post)
+                    if article_content:
+                        is_article = True
+                        if not article_url:
+                            article_url = fetched_article_url
+                        if text:
+                            text = f"{text}\n\n--- Full Article ---\n\n{article_content}"
+                        else:
+                            text = article_content
+                        print(f"   → Fetched article content ({len(article_content)} chars)")
+                    elif not text:
+                        continue  # no text and no article content, skip
 
-            if not text:
-                continue
+                if not text:
+                    continue
 
-            # Store article URL for sheet display (avoid writing full article to post_content)
-            if is_article:
-                post["_article_url"] = article_url or ""
+                # Store article URL for sheet display (avoid writing full article to post_content)
+                if is_article:
+                    post["_article_url"] = article_url or ""
 
-            # All posts go through LLM judgment
-            llm_result = get_llm_decision_with_reason(base_prompt, text)
-            is_match = llm_result["decision"]
+                # All posts go through LLM judgment
+                llm_result = get_llm_decision_with_reason(base_prompt, text)
+                is_match = llm_result["decision"]
 
-            # Generate reply recommendation, summary, category, and question only for matched posts
-            recommendation = ""
-            question_reco = ""
-            summary = ""
-            category = "others"
-            brain_context = ""
-            brain_result = None
-            if is_match:
-                # Query brain API + generate note context analysis
-                brain_result = brain_client.get_note_context(text[:500], call_chatgpt)
-                if brain_result and brain_result.get("total", 0) > 0:
-                    brain_context = brain_result.get("brain_context", "")
-                    print(f"   [Brain] Found {brain_result['total']} related notes")
+                # Generate reply recommendation, summary, category, and question only for matched posts
+                recommendation = ""
+                question_reco = ""
+                summary = ""
+                category = "others"
+                brain_context = ""
+                brain_result = None
+                if is_match:
+                    # Query brain API + generate note context analysis
+                    brain_result = brain_client.get_note_context(text[:500], call_chatgpt)
+                    if brain_result and brain_result.get("total", 0) > 0:
+                        brain_context = brain_result.get("brain_context", "")
+                        print(f"   [Brain] Found {brain_result['total']} related notes")
 
-                # Enrich reply prompt with note context if available
-                enriched_reply_prompt = reply_prompt
-                if brain_context:
-                    enriched_reply_prompt = (
-                        f"{reply_prompt}\n\n"
-                        "Reference from your Second Brain (use to add your perspective if relevant):\n"
-                        f"{brain_context}"
+                    # Enrich reply prompt with note context if available
+                    enriched_reply_prompt = reply_prompt
+                    if brain_context:
+                        enriched_reply_prompt = (
+                            f"{reply_prompt}\n\n"
+                            "Reference from your Second Brain (use to add your perspective if relevant):\n"
+                            f"{brain_context}"
+                        )
+
+                    recommendation = generate_reply_recommendation(text, prompt=enriched_reply_prompt)
+
+                    # Enrich question prompt with note context if available
+                    enriched_question_prompt = question_prompt
+                    if brain_context:
+                        enriched_question_prompt = (
+                            f"{question_prompt}\n\n"
+                            "Reference from your Second Brain (use to add depth if relevant):\n"
+                            f"{brain_context}"
+                        )
+                    question_reco = generate_reply_recommendation(text, prompt=enriched_question_prompt)
+                    summary = generate_post_summary(text, prompt=summary_prompt)
+                    category = categorize_post(text, prompt=category_prompt)
+
+                # Add to all_posts_with_decisions (for testing sheet)
+                all_posts_with_decisions.append({
+                    "profile_url": url,
+                    "post": post,
+                    "llm_decision": llm_result["decision_text"],
+                    "llm_reason": llm_result["reason"],
+                    "prompt_used": "match_prompt",
+                    "reply_reco": recommendation,
+                    "post_id": post.get("id") or post.get("postId") or "",
+                    "timestamp": post.get("timestamp"),
+                    "prompt_version": active_version,
+                })
+
+                # Add to matched lists only if LLM says yes (for output sheet)
+                if is_match:
+                    matched.append(post)
+                    matched_with_profile.append(
+                        {
+                            "profile_url": url,
+                            "post": post,
+                            "reply_reco": recommendation,
+                            "question_reco": question_reco,
+                            "summary": summary,
+                            "category": category,
+                            "post_id": post.get("id") or post.get("postId") or "",
+                            "timestamp": post.get("timestamp"),
+                            "brain_context": brain_context,
+                            "brain_total": brain_result.get("total", 0) if brain_result else 0,
+                        }
                     )
-
-                recommendation = generate_reply_recommendation(text, prompt=enriched_reply_prompt)
-                question_reco = generate_reply_recommendation(text, prompt=question_prompt)
-                summary = generate_post_summary(text, prompt=summary_prompt)
-                category = categorize_post(text, prompt=category_prompt)
-
-            # Add to all_posts_with_decisions (for testing sheet)
-            all_posts_with_decisions.append({
-                "profile_url": url,
-                "post": post,
-                "llm_decision": llm_result["decision_text"],
-                "llm_reason": llm_result["reason"],
-                "prompt_used": "match_prompt",
-                "reply_reco": recommendation,
-                "post_id": post.get("id") or post.get("postId") or "",
-                "timestamp": post.get("timestamp"),
-                "prompt_version": active_version,
-            })
-
-            # Add to matched lists only if LLM says yes (for output sheet)
-            if is_match:
-                matched.append(post)
-                matched_with_profile.append(
-                    {
-                        "profile_url": url,
-                        "post": post,
-                        "reply_reco": recommendation,
-                        "question_reco": question_reco,
-                        "summary": summary,
-                        "category": category,
-                        "post_id": post.get("id") or post.get("postId") or "",
-                        "timestamp": post.get("timestamp"),
-                        "brain_context": brain_context,
-                        "brain_total": brain_result.get("total", 0) if brain_result else 0,
-                    }
-                )
+            except Exception as e:
+                post_id = post.get("id") or post.get("postId") or "?"
+                print(f"   [ERROR] Failed to process post {post_id}: {e}")
+                continue
 
     # For now, print a simple summary and return the matches for caller use.
     print(f"Total posts fetched: {total_posts}")
@@ -1058,6 +1096,17 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         pid = post.get("id") or post.get("postId")
         preview = (post.get("text") or post.get("postText") or "")[:140].replace("\n", " ")
         print(f"{idx}. {pid}: {preview!r}")
+
+    # Pipeline quality stats
+    if matched_with_profile:
+        fallback_reply = sum(1 for m in matched_with_profile if m.get("reply_reco") == "No recommendation generated.")
+        fallback_question = sum(1 for m in matched_with_profile if m.get("question_reco") == "No recommendation generated.")
+        with_brain = sum(1 for m in matched_with_profile if m.get("brain_context"))
+        print(f"\n[Pipeline Stats]")
+        print(f"  Matched posts: {len(matched_with_profile)}")
+        print(f"  With brain context: {with_brain}")
+        print(f"  With fallback reply: {fallback_reply}")
+        print(f"  With fallback question: {fallback_question}")
 
     # Write ALL posts (including rejected ones) to testing sheet for analysis
     if all_posts_with_decisions:
