@@ -1,8 +1,12 @@
 """Client for cesecondbrain-api + LLM brain context generation."""
 from __future__ import annotations
+import logging
 import os
+import re
 from typing import Optional
 import requests
+
+logger = logging.getLogger(__name__)
 
 BRAIN_ANALYSIS_PROMPT = """\
 你是一位知識管理專家，正在幫助使用者分析一篇 X (Twitter) 貼文與他的 Second Brain（個人知識庫）的關聯。
@@ -74,13 +78,24 @@ class BrainClient:
         2. Call LLM to generate rich brain_context analysis
         Returns: {"brain_context": str, "total": int} or None
         """
-        if not self.enabled or not self.base_url or not self.api_key:
+        if not self.enabled:
+            logger.warning("[Brain] Disabled (BRAIN_ENABLED != true)")
+            return None
+        if not self.base_url or not self.api_key:
+            logger.warning(
+                "[Brain] Missing config: url=%s key=%s",
+                "SET" if self.base_url else "MISSING",
+                "SET" if self.api_key else "MISSING",
+            )
             return None
         try:
+            # Sanitize query: remove punctuation that may break FTS5 on server
+            sanitized = re.sub(r"[.,;:!?\-\—\–\"'`()\[\]{}/\\]", " ", post_text[:500])
+            sanitized = re.sub(r"\s+", " ", sanitized).strip()
             resp = requests.post(
                 f"{self.base_url}/search",
                 json={
-                    "query": post_text[:500],
+                    "query": sanitized,
                     "mode": "hybrid",
                     "limit": self.limit,
                     "include_linked": True,
@@ -93,8 +108,10 @@ class BrainClient:
             data = resp.json()
             results = data.get("results", [])
             if not results:
+                logger.info("[Brain] No matching notes for: %s", post_text[:80])
                 return None
 
+            logger.info("[Brain] Found %d notes, generating context...", len(results))
             # Build notes context for LLM
             notes_context = _build_notes_context(results)
             analysis_prompt = BRAIN_ANALYSIS_PROMPT.format(notes_context=notes_context)
@@ -112,5 +129,5 @@ class BrainClient:
                 "total": data.get("total", len(results)),
             }
         except Exception as e:
-            print(f"[Brain] Failed: {e}")
+            logger.error(f"Brain API failed for query (first 80 chars): {post_text[:80]!r}: {e}")
             return None

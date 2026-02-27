@@ -855,6 +855,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
 
     from x_auto.brain.client import BrainClient
     brain_client = BrainClient()
+    print(f"[Brain Config] enabled={brain_client.enabled} url={'SET' if brain_client.base_url else 'MISSING'} key={'SET' if brain_client.api_key else 'MISSING'}")
 
     # Get active prompt version from prompt_history
     active_version = get_active_prompt_version(sheet_client, "match_prompt")
