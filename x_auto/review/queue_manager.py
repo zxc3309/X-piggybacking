@@ -43,7 +43,7 @@ REPLY_QUEUE_HEADERS = [
     "views",
 ]
 
-VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed"}
+VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed", "conversation_blocked"}
 
 # Simple in-memory cache to avoid repeated Google Sheets API calls
 _cache: Dict[str, Any] = {"items": None, "timestamp": 0.0}
@@ -337,6 +337,11 @@ def mark_failed(queue_id: str, error_message: str) -> bool:
     return update_item(queue_id, {"status": "failed", "error_message": error_message})
 
 
+def mark_conversation_blocked(queue_id: str, error_message: str) -> bool:
+    """Mark an item as blocked by conversation control (won't be retried)."""
+    return update_item(queue_id, {"status": "conversation_blocked", "error_message": error_message})
+
+
 def get_daily_sent_count() -> int:
     """Count how many replies were sent today (UTC)."""
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -352,7 +357,7 @@ def get_stats() -> Dict[str, int]:
     """Return counts by status and daily sent count."""
     items = get_all_items()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0, "total": len(items)}
+    stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0, "conversation_blocked": 0, "total": len(items)}
     daily_sent = 0
     for item in items:
         s = item.get("status", "")

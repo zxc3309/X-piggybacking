@@ -101,10 +101,17 @@ def check_and_send() -> None:
             queue_manager.mark_sent(queue_id)
             sent_count += 1
         except Exception as e:
+            from x_auto.x_api.x_client import ConversationControlError
             error_msg = str(e)[:500]
-            logger.error(f"[AutoSender] Failed to send reply for queue_id={queue_id}: {e}", exc_info=True)
-            queue_manager.mark_failed(queue_id, error_msg)
-            _notify_failure(item, error_msg)
+
+            if isinstance(e, ConversationControlError):
+                logger.warning(f"[AutoSender] Conversation control blocked reply for queue_id={queue_id}: {e}")
+                queue_manager.mark_conversation_blocked(queue_id, error_msg)
+                _notify_failure(item, f"[CONVERSATION BLOCKED] {error_msg}")
+            else:
+                logger.error(f"[AutoSender] Failed to send reply for queue_id={queue_id}: {e}", exc_info=True)
+                queue_manager.mark_failed(queue_id, error_msg)
+                _notify_failure(item, error_msg)
 
     logger.info(f"[AutoSender] Finished. Sent {sent_count} replies. "
                 f"Daily total: {daily_sent + sent_count}/{daily_limit}")

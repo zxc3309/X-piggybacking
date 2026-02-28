@@ -20,6 +20,14 @@ from requests_oauthlib import OAuth1
 
 TWEETS_ENDPOINT = "https://api.twitter.com/2/tweets"
 
+# Substring in X API error body that indicates conversation control restriction
+_CONVERSATION_CONTROL_MSG = "not been mentioned or otherwise engaged"
+
+
+class ConversationControlError(Exception):
+    """Raised when a reply is blocked by the tweet author's conversation control settings."""
+    pass
+
 
 def _get_auth() -> Dict[str, Optional[str]]:
     """
@@ -69,22 +77,8 @@ def _get_auth() -> Dict[str, Optional[str]]:
     )
 
 
-def post_reply(text: str, in_reply_to_post_id: str) -> Dict[str, Any]:
-    """
-    Post a reply to an existing X (Twitter) post using the v2 tweets endpoint.
-
-    Args:
-        text: Reply body to publish.
-        in_reply_to_post_id: The tweet ID to reply to.
-
-    Returns:
-        Parsed JSON response from the X API.
-
-    Raises:
-        RuntimeError: For missing credentials.
-        requests.HTTPError: For non-success HTTP responses.
-        ValueError: For JSON decoding errors in the API response.
-    """
+def _build_request_args() -> tuple:
+    """Build (auth_obj_or_None, headers) from environment credentials."""
     auth_conf = _get_auth()
     headers: Dict[str, str] = {"Content-Type": "application/json"}
     auth_obj = None
@@ -98,6 +92,86 @@ def post_reply(text: str, in_reply_to_post_id: str) -> Dict[str, Any]:
         )
     else:
         headers["Authorization"] = f"Bearer {auth_conf['access_token']}"
+
+    return auth_obj, headers
+
+
+def get_tweet(tweet_id: str, tweet_fields: str = "reply_settings,author_id") -> Optional[Dict[str, Any]]:
+    """
+    GET /2/tweets/:id — look up a tweet's metadata.
+
+    Returns parsed JSON on success, or None if the request fails
+    (e.g. Free tier doesn't support this endpoint).
+    """
+    auth_obj, headers = _build_request_args()
+    url = f"{TWEETS_ENDPOINT}/{tweet_id}"
+    params = {"tweet.fields": tweet_fields} if tweet_fields else {}
+
+    try:
+        response = requests.get(
+            url, params=params, headers=headers, auth=auth_obj, timeout=15,
+        )
+    except Exception:
+        return None
+
+    if 200 <= response.status_code < 300:
+        try:
+            return response.json()
+        except ValueError:
+            return None
+    return None
+
+
+def post_tweet(text: str) -> Dict[str, Any]:
+    """
+    POST /2/tweets — post a standalone tweet (not a reply).
+
+    Returns:
+        Parsed JSON response from the X API.
+
+    Raises:
+        requests.HTTPError: For non-success HTTP responses.
+    """
+    auth_obj, headers = _build_request_args()
+    payload = {"text": text}
+
+    response = requests.post(
+        TWEETS_ENDPOINT,
+        json=payload,
+        headers=headers,
+        auth=auth_obj,
+        timeout=30,
+    )
+
+    if not 200 <= response.status_code < 300:
+        print("X API response headers:", dict(response.headers))
+        message = f"X API request failed ({response.status_code}): {response.text}"
+        raise requests.HTTPError(message, response=response)
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise ValueError("Failed to decode X API response as JSON.") from exc
+
+
+def post_reply(text: str, in_reply_to_post_id: str) -> Dict[str, Any]:
+    """
+    Post a reply to an existing X (Twitter) post using the v2 tweets endpoint.
+
+    Args:
+        text: Reply body to publish.
+        in_reply_to_post_id: The tweet ID to reply to.
+
+    Returns:
+        Parsed JSON response from the X API.
+
+    Raises:
+        ConversationControlError: When the tweet author's conversation settings block replies.
+        RuntimeError: For missing credentials.
+        requests.HTTPError: For non-success HTTP responses.
+        ValueError: For JSON decoding errors in the API response.
+    """
+    auth_obj, headers = _build_request_args()
 
     payload = {
         "text": text,
@@ -115,7 +189,15 @@ def post_reply(text: str, in_reply_to_post_id: str) -> Dict[str, Any]:
     if not 200 <= response.status_code < 300:
         # Aid debugging by exposing returned headers (e.g., x-access-level).
         print("X API response headers:", dict(response.headers))
-        message = f"X API request failed ({response.status_code}): {response.text}"
+        resp_text = response.text
+
+        # Detect conversation control restriction
+        if response.status_code == 403 and _CONVERSATION_CONTROL_MSG in resp_text.lower():
+            raise ConversationControlError(
+                f"Reply blocked by conversation control (403): {resp_text}"
+            )
+
+        message = f"X API request failed ({response.status_code}): {resp_text}"
         raise requests.HTTPError(message, response=response)
 
     try:

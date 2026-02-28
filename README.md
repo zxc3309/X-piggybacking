@@ -154,7 +154,7 @@ Google Sheets (Researcher)
 **reply_queue** (pending approvals):
 - `queue_id`, `post_id`, `post_link`, `author`
 - `original_reply`, `edited_reply`
-- `status` (pending/approved/rejected/sent/failed)
+- `status` (pending/approved/rejected/sent/failed/conversation_blocked)
 - `approved_at`, `sent_at`, `error_message`
 - `bookmarks`, `views` - Post engagement metrics from X
 

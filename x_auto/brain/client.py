@@ -120,7 +120,7 @@ class BrainClient:
             brain_context = call_llm_fn(
                 prompt=analysis_prompt,
                 content=post_text[:1000],
-                model="gpt-4o",        # Use gpt-4o for reasoning quality
+                model="gpt-5.2",       # Use gpt-5.2 for reasoning quality
                 max_tokens=600,
             )
 

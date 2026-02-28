@@ -33,6 +33,9 @@
     <a class="tab {% if current_filter == 'failed' %}active{% endif %}" href="{{ prefix }}/review?status=failed">
         Failed<span class="tab-count">{{ stats.failed }}</span>
     </a>
+    <a class="tab {% if current_filter == 'conversation_blocked' %}active{% endif %}" href="{{ prefix }}/review?status=conversation_blocked">
+        Blocked<span class="tab-count">{{ stats.conversation_blocked }}</span>
+    </a>
 </nav>
 
 {% if items %}
