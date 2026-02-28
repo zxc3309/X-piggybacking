@@ -145,6 +145,7 @@ Google Sheets (Researcher)
 - `post_id`, `author`, `text`, `created_at`
 - `llm_decision` (0/1), `llm_reason`
 - `engagement_score`, `likes`, `retweets`, `replies`
+- `brain_context`, `related_notes_count` - Second Brain analysis and match count
 
 **scraped_output** (matched posts):
 - Same as all_post, plus:
@@ -156,6 +157,7 @@ Google Sheets (Researcher)
 - `original_reply`, `edited_reply`
 - `status` (pending/approved/rejected/sent/failed/conversation_blocked)
 - `approved_at`, `sent_at`, `error_message`
+- `brain_context`, `related_notes_count` - Second Brain analysis and match count
 - `bookmarks`, `views` - Post engagement metrics from X
 
 ## Environment Variables

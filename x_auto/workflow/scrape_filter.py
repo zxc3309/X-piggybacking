@@ -717,18 +717,40 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
 
         existing = ws.get_all_values()
 
+        # Define expected headers for all_post sheet
+        expected_all_post_headers = [
+            "scraped_at", "profile_url", "author", "post_content", "timestamp",
+            "likes", "reposts", "replies", "bookmarks", "views",
+            "llm_decision", "llm_reason", "prompt_used",
+            "reply_recommendation", "post_link",
+            "user_decision", "user_comment", "feedback_timestamp",
+            "feedback_source", "feedback_status", "prompt_version",
+            "brain_context", "related_notes_count"
+        ]
+
         # Add headers if sheet is empty
         if not any(cell for r in existing for cell in r):
-            headers = [
-                "scraped_at", "profile_url", "author", "post_content", "timestamp",
-                "likes", "reposts", "replies", "bookmarks", "views",
-                "llm_decision", "llm_reason", "prompt_used",
-                "reply_recommendation", "post_link",
-                "user_decision", "user_comment", "feedback_timestamp",
-                "feedback_source", "feedback_status", "prompt_version"
-            ]
-            ws.append_row(headers, value_input_option="USER_ENTERED")
+            ws.append_row(expected_all_post_headers, value_input_option="USER_ENTERED")
             existing = ws.get_all_values()
+        else:
+            # Auto-migrate: check for missing columns and remap data
+            current_headers = existing[0] if existing else []
+            missing = [h for h in expected_all_post_headers if h not in current_headers]
+            if missing:
+                print(f"Migrating all_post: adding columns {missing}")
+                old_col_map = {h: i for i, h in enumerate(current_headers)}
+                new_rows = [expected_all_post_headers]
+                for row in existing[1:]:
+                    new_row = []
+                    for h in expected_all_post_headers:
+                        if h in old_col_map and old_col_map[h] < len(row):
+                            new_row.append(row[old_col_map[h]])
+                        else:
+                            new_row.append("")
+                    new_rows.append(new_row)
+                ws.clear()
+                ws.update(new_rows, value_input_option="USER_ENTERED")
+                existing = ws.get_all_values()
 
         # Build deduplication set
         existing_keys = set()
@@ -794,7 +816,8 @@ def write_all_posts_to_testing_sheet(all_posts_data: List[Dict[str, Any]]) -> in
                 llm_decision, llm_reason, prompt_used,
                 reply_reco, post_link,
                 user_decision, user_comment, feedback_timestamp,
-                feedback_source, feedback_status, prompt_version
+                feedback_source, feedback_status, prompt_version,
+                item.get("brain_context", ""), item.get("brain_total", 0)
             ])
 
         # Write rows
@@ -1064,6 +1087,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                     "post_id": post.get("id") or post.get("postId") or "",
                     "timestamp": post.get("timestamp"),
                     "prompt_version": active_version,
+                    "brain_context": brain_context,
+                    "brain_total": brain_result.get("total", 0) if brain_result else 0,
                 })
 
                 # Add to matched lists only if LLM says yes (for output sheet)
@@ -1251,6 +1276,7 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "question_recommendation": question_reco,
                         "post_id": post_id,
                         "brain_context": item.get("brain_context", ""),
+                        "related_notes_count": item.get("brain_total", 0),
                         "bookmarks": post.get("bookmarkCount", 0),
                         "views": post.get("viewCount", 0),
                     })

@@ -39,6 +39,7 @@ REPLY_QUEUE_HEADERS = [
     "sent_at",
     "error_message",
     "brain_context",
+    "related_notes_count",
     "bookmarks",
     "views",
 ]
@@ -164,6 +165,7 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
             "",           # sent_at
             "",           # error_message
             item.get("brain_context", ""),  # brain_context
+            str(item.get("related_notes_count", "")),  # related_notes_count
             str(item.get("bookmarks", "")),
             str(item.get("views", "")),
         ])
