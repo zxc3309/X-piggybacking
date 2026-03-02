@@ -42,7 +42,7 @@
     {% for item in items | reverse %}
     <div class="card" data-status="{{ item.status }}">
         <div class="card-header">
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="card-meta">
                 <span class="card-author">
                     {% if item.author %}
                         <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>

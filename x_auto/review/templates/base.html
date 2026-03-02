@@ -545,6 +545,14 @@
             flex-shrink: 0;
         }
 
+        /* ── Card meta (author + status + badge row) ── */
+        .card-meta {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
         /* ── Brain badge (queue cards) ── */
         .brain-badge {
             font-size: 10px;
@@ -576,23 +584,71 @@
         .review-left::-webkit-scrollbar { width: 4px; }
         .review-left::-webkit-scrollbar-thumb { background: var(--border); }
 
+        /* ── Status bar (review detail) ── */
+        .status-bar {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
         /* ── Reply composer (full width below grid) ── */
         .reply-composer {
             border-top: 1px solid var(--border);
             padding: 20px 0 32px;
             margin-top: 8px;
         }
+        .composer-actions {
+            display: flex;
+            gap: 8px;
+            margin: 16px 0 0;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
+            /* Header: stack on mobile */
+            .header-inner {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .header h1 { font-size: 17px; }
+
+            /* Tabs: larger touch targets */
+            .tab {
+                padding: 14px 14px;
+                font-size: 14px;
+            }
+
+            /* Cards: better mobile spacing */
+            .card { padding: 14px 12px; }
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+            .card-time { font-size: 12px; }
+            .post-content { font-size: 14px; }
+            .reply-preview { font-size: 13px; padding: 10px 12px; }
+
+            /* Buttons: larger touch targets */
+            .btn { padding: 10px 16px; font-size: 14px; }
+            .btn-sm { padding: 8px 14px; font-size: 13px; }
+
+            /* Review detail: single column */
             .review-layout {
                 grid-template-columns: 1fr;
+                gap: 16px;
             }
             .review-left {
                 position: static;
                 max-height: none;
                 overflow-y: visible;
             }
+
+            /* Reply composer */
             .reply-composer {
                 position: sticky;
                 bottom: 0;
@@ -602,10 +658,51 @@
                 z-index: 50;
                 border-top: 1px solid var(--border);
             }
+            .edit-area {
+                min-height: 100px;
+                font-size: 16px; /* prevent iOS zoom on focus */
+            }
+
+            /* Suggestion box */
+            .suggestion-box { padding: 10px 12px; }
+            .brain-panel { padding: 12px; }
+
+            /* Status bar: wrap nicely */
+            .status-bar { gap: 8px; }
+
+            /* Composer actions: stack on mobile */
+            .composer-actions {
+                flex-direction: column-reverse;
+                gap: 10px;
+            }
+            .composer-actions > div {
+                display: flex;
+                gap: 8px;
+            }
+            .composer-actions .btn {
+                flex: 1;
+                justify-content: center;
+                padding: 12px 16px;
+            }
         }
         @media (max-width: 480px) {
-            .card-actions { flex-direction: column; }
-            .btn { justify-content: center; }
+            /* Even tighter mobile */
+            .container { padding: 0 10px; }
+
+            .header h1 { font-size: 15px; }
+            .header h1 a { gap: 5px; }
+
+            .tab { padding: 12px 10px; font-size: 13px; }
+
+            /* Stack card actions vertically */
+            .card-actions {
+                flex-direction: column;
+            }
+            .btn { justify-content: center; width: 100%; }
+
+            /* Quota badge: compact */
+            .quota-badge { font-size: 11px; }
+            .quota-bar-track { width: 48px; }
         }
     </style>
 </head>
