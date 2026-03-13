@@ -19,11 +19,11 @@
 
 <!-- Status bar -->
 <div class="status-bar">
-    <span class="card-status status-{{ item.status }}" style="font-size: 13px; padding: 3px 12px;">
+    <span class="card-status status-{{ item.status }} card-status-detail">
         {{ item.status }}
     </span>
     {% if item.author %}
-    <span style="font-size: 13px; color: var(--text-secondary);">
+    <span class="status-bar-author">
         @{{ item.author }}
     </span>
     {% endif %}
@@ -122,7 +122,7 @@
         {% else %}
         <div class="section" style="margin-top: 0;">
             <div class="section-label" style="color: var(--text-secondary);">Second Brain</div>
-            <div style="padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 13px; border: 1px dashed var(--border); border-radius: 2px;">
+            <div class="empty-brain-note">
                 No related notes found for this post.
             </div>
         </div>
@@ -131,7 +131,7 @@
         <!-- Audit trail (collapsed) -->
         <div class="section">
             <details>
-                <summary style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; cursor: pointer; user-select: none;">Audit Trail</summary>
+                <summary class="section-label" style="cursor: pointer; user-select: none;">Audit Trail</summary>
                 <table class="audit-table" style="margin-top: 10px;">
                     <tr>
                         <td class="audit-key">Created</td>
