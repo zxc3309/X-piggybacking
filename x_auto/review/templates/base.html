@@ -593,6 +593,14 @@
             flex-wrap: wrap;
         }
 
+        /* ── Copy button ── */
+        .btn-copy {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-copy:hover { background: var(--surface-2); color: var(--text); border-color: var(--text-secondary); }
+
         /* ── Reply composer (full width below grid) ── */
         .reply-composer {
             border-top: 1px solid var(--border);
@@ -665,7 +673,7 @@
             .empty-state h2 { font-size: 20px; }
             .empty-state p { font-size: 15px; }
 
-            /* Review detail: single column */
+            /* Review detail: single column with reordered sections */
             .review-layout {
                 grid-template-columns: 1fr;
                 gap: 16px;
@@ -674,7 +682,15 @@
                 position: static;
                 max-height: none;
                 overflow-y: visible;
+                order: 2; /* Original post below Brain + AI suggestions */
             }
+            .review-right {
+                order: 1; /* Brain + AI suggestions first on mobile */
+            }
+            /* Within review-right, Brain comes before AI suggestions */
+            .review-right { display: flex; flex-direction: column; }
+            .review-brain { order: 1; }
+            .review-suggestions { order: 2; }
 
             /* Reply composer */
             .reply-composer {

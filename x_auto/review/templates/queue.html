@@ -1,17 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Review Queue — Reply Review{% endblock %}
 
-{% block header_right %}
-{% set ratio = stats.daily_sent / stats.daily_limit if stats.daily_limit > 0 else 0 %}
-{% set pct = (ratio * 100) | int %}
-<div class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
-    <span class="quota-bar-track">
-        <span class="quota-bar-fill" style="width: {% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></span>
-    </span>
-    <span class="quota-label">{{ stats.daily_sent }}/{{ stats.daily_limit }}</span>
-</div>
-{% endblock %}
-
 {% block content %}
 <!-- Filter tabs -->
 <nav class="tabs">
@@ -24,17 +13,8 @@
     <a class="tab {% if current_filter == 'approved' %}active{% endif %}" href="{{ prefix }}/review?status=approved">
         Approved<span class="tab-count">{{ stats.approved }}</span>
     </a>
-    <a class="tab {% if current_filter == 'sent' %}active{% endif %}" href="{{ prefix }}/review?status=sent">
-        Sent<span class="tab-count">{{ stats.sent }}</span>
-    </a>
     <a class="tab {% if current_filter == 'rejected' %}active{% endif %}" href="{{ prefix }}/review?status=rejected">
         Rejected<span class="tab-count">{{ stats.rejected }}</span>
-    </a>
-    <a class="tab {% if current_filter == 'failed' %}active{% endif %}" href="{{ prefix }}/review?status=failed">
-        Failed<span class="tab-count">{{ stats.failed }}</span>
-    </a>
-    <a class="tab {% if current_filter == 'conversation_blocked' %}active{% endif %}" href="{{ prefix }}/review?status=conversation_blocked">
-        Blocked<span class="tab-count">{{ stats.conversation_blocked }}</span>
     </a>
 </nav>
 
@@ -91,17 +71,14 @@
         </div>
         {% endif %}
 
-        {% if item.error_message %}
-        <div class="error-msg">Error: {{ item.error_message }}</div>
-        {% endif %}
-
         <div class="card-actions">
             {% if item.status == 'pending' %}
-            <button type="button" class="btn btn-approve btn-sm" onclick="approveItem('{{ item.queue_id }}', '', this)">Approve</button>
-            <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
+            {% set reply_text = item.edited_reply or item.original_reply or "" %}
+            {% set post_id = item.post_id or "" %}
+            {% if post_id and reply_text %}
+            <a class="btn btn-approve btn-sm" href="https://x.com/intent/tweet?in_reply_to={{ post_id }}&text={{ reply_text | urlencode }}" target="_blank" rel="noopener" onclick="approveItem('{{ item.queue_id }}', '{{ reply_text | e }}', null)">Reply on X ↗</a>
             {% endif %}
-            {% if item.status == 'failed' %}
-            <button type="button" class="btn btn-approve btn-sm" onclick="approveItem('{{ item.queue_id }}', '', this)">Retry</button>
+            <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
             {% endif %}
             {% if item.post_link %}
             <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>

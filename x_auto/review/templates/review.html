@@ -1,17 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Review — @{{ item.author }} — Reply Review{% endblock %}
 
-{% block header_right %}
-{% set ratio = stats.daily_sent / stats.daily_limit if stats.daily_limit > 0 else 0 %}
-{% set pct = (ratio * 100) | int %}
-<div class="quota-badge {% if ratio >= 1 %}quota-full{% elif ratio >= 0.7 %}quota-warn{% else %}quota-ok{% endif %}">
-    <span class="quota-bar-track">
-        <span class="quota-bar-fill" style="width: {% if pct > 100 %}100{% else %}{{ pct }}{% endif %}%"></span>
-    </span>
-    <span class="quota-label">{{ stats.daily_sent }}/{{ stats.daily_limit }}</span>
-</div>
-{% endblock %}
-
 {% block content %}
 <div style="padding: 16px 0 8px;">
     <a class="btn btn-back" href="{{ prefix }}/review?status=pending">← Back to queue</a>
@@ -29,9 +18,6 @@
     {% endif %}
     {% if item.brain_context %}
     <span class="brain-badge">B</span>
-    {% endif %}
-    {% if item.error_message %}
-    <div class="error-msg" style="margin: 0; flex: 1;">{{ item.error_message }}</div>
     {% endif %}
 </div>
 
@@ -79,11 +65,27 @@
 
     </div><!-- /review-left -->
 
-    <!-- Right column: AI Suggestions + Brain Context -->
+    <!-- Right column: Brain Context (first on mobile) + AI Suggestions -->
     <div class="review-right">
 
+        {% if item.brain_context %}
+        <div class="section review-brain" style="margin-top: 0;">
+            <div class="section-label" style="color: var(--brain);">Second Brain Analysis</div>
+            <div class="brain-panel">
+                <div class="brain-content" data-raw="{{ item.brain_context | e }}">{{ item.brain_context }}</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="section review-brain" style="margin-top: 0;">
+            <div class="section-label" style="color: var(--text-secondary);">Second Brain</div>
+            <div style="padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 13px; border: 1px dashed var(--border); border-radius: 2px;">
+                No related notes found for this post.
+            </div>
+        </div>
+        {% endif %}
+
         <!-- AI suggestions -->
-        <div class="section" style="margin-top: 0;">
+        <div class="section review-suggestions">
             <div class="section-label">AI Suggestions</div>
             <div style="display: flex; flex-direction: column; gap: 12px;">
 
@@ -112,22 +114,6 @@
             </div>
         </div>
 
-        {% if item.brain_context %}
-        <div class="section" style="margin-top: 0;">
-            <div class="section-label" style="color: var(--brain);">Second Brain Analysis</div>
-            <div class="brain-panel">
-                <div class="brain-content" data-raw="{{ item.brain_context | e }}">{{ item.brain_context }}</div>
-            </div>
-        </div>
-        {% else %}
-        <div class="section" style="margin-top: 0;">
-            <div class="section-label" style="color: var(--text-secondary);">Second Brain</div>
-            <div style="padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 13px; border: 1px dashed var(--border); border-radius: 2px;">
-                No related notes found for this post.
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Audit trail (collapsed) -->
         <div class="section">
             <details>
@@ -140,10 +126,6 @@
                     <tr>
                         <td class="audit-key">Approved</td>
                         <td class="audit-val">{{ item.approved_at or "—" }}</td>
-                    </tr>
-                    <tr>
-                        <td class="audit-key">Sent</td>
-                        <td class="audit-val">{{ item.sent_at or "—" }}</td>
                     </tr>
                 </table>
             </details>
@@ -176,8 +158,9 @@
             <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
         </div>
         <div style="display: flex; gap: 8px;">
+            <button type="button" id="copy-btn" class="btn btn-copy">Copy</button>
             <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
-            <button type="button" id="approve-btn" class="btn btn-approve">Approve &amp; Send</button>
+            <button type="button" id="reply-on-x-btn" class="btn btn-approve">Reply on X ↗</button>
         </div>
     </div>
 </div>
@@ -189,6 +172,7 @@
     const textarea = document.getElementById('edited-reply');
     const counter = document.getElementById('char-count');
     const QUEUE_ID = '{{ item.queue_id }}';
+    const POST_ID = '{{ item.post_id or "" }}';
 
     function updateCounter() {
         const len = textarea.value.length;
@@ -223,22 +207,87 @@
         }
     }
 
-    // Legacy compatibility
-    function copyReplyToEditor() { useReply(); }
-    function copyQuestionToEditor() { useQuestion(); }
-    function copyToEditor() { useReply(); }
-
-    // AJAX action handlers
-    document.getElementById('approve-btn').addEventListener('click', async function() {
-        const btn = this;
+    // Get the reply text (from textarea or fall back to AI suggestion)
+    function getReplyText() {
         const text = textarea.value.trim();
-        const result = await approveItem(QUEUE_ID, text, btn);
-        if (result.success) {
-            setTimeout(() => {
-                window.location.href = `${API_PREFIX}/review?status=pending`;
-            }, 500);
+        if (text) return text;
+        const aiReply = document.getElementById('ai-reply');
+        return aiReply ? aiReply.textContent.trim() : '';
+    }
+
+    // Open X Intent URL to reply on X
+    async function replyOnX() {
+        const btn = document.getElementById('reply-on-x-btn');
+        const text = getReplyText();
+
+        if (!text) {
+            alert('Please enter or select a reply first.');
+            return;
         }
-    });
+
+        if (!POST_ID) {
+            alert('Cannot determine post ID for this item.');
+            return;
+        }
+
+        // Save the edited reply and approve the item first
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const result = await approveItem(QUEUE_ID, text, null);
+            if (!result.success) {
+                btn.disabled = false;
+                btn.textContent = 'Reply on X ↗';
+                return;
+            }
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = 'Reply on X ↗';
+            alert('Error saving reply: ' + err.message);
+            return;
+        }
+
+        // Build X Intent URL and open it
+        const intentUrl = 'https://x.com/intent/tweet?in_reply_to=' + encodeURIComponent(POST_ID) + '&text=' + encodeURIComponent(text);
+        window.open(intentUrl, '_blank');
+
+        btn.textContent = 'Opened!';
+        setTimeout(() => {
+            window.location.href = `${API_PREFIX}/review?status=pending`;
+        }, 1000);
+    }
+
+    // Copy reply text to clipboard
+    async function copyReplyText() {
+        const btn = document.getElementById('copy-btn');
+        const text = getReplyText();
+
+        if (!text) {
+            alert('No reply text to copy.');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        } catch (err) {
+            // Fallback for older browsers
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+        }
+    }
+
+    // Event listeners
+    document.getElementById('reply-on-x-btn').addEventListener('click', replyOnX);
+    document.getElementById('copy-btn').addEventListener('click', copyReplyText);
 
     document.getElementById('reject-btn').addEventListener('click', async function() {
         const btn = this;
@@ -258,10 +307,10 @@
 
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // Cmd+Enter or Ctrl+Enter = Approve & Send
+        // Cmd+Enter or Ctrl+Enter = Reply on X
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('approve-btn').click();
+            document.getElementById('reply-on-x-btn').click();
         }
         // Cmd+S or Ctrl+S = Save Draft
         if ((e.metaKey || e.ctrlKey) && e.key === 's') {

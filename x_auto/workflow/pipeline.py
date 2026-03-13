@@ -1,7 +1,7 @@
 """
 High-level automation pipeline:
 (1) fetch posts → (2) keyword match → (3) score → (4) generate reply
-→ (5) send to X → (6) log results.
+→ (5) route to human review.
 
 This module wires together the major components while leaving detailed
 utilities (ID tracking, logging formatting, human approval) as stubs.
@@ -17,7 +17,6 @@ from x_auto.scrapers.apify_client import fetch_posts
 from x_auto.matcher.keyword_matcher import match_keywords, score_matches
 from x_auto.reply_engine.reply_generator import build_reply_text, select_best_template
 from x_auto.sheets.client import GoogleSheetsClient
-from x_auto.x_api.x_client import post_reply
 
 
 def run_pipeline() -> None:
@@ -30,9 +29,7 @@ def run_pipeline() -> None:
         3) Filter out posts that have already been processed (placeholder utility).
         4) Perform keyword matching and compute scores.
         5) Choose the best template and generate a reply (delegated to reply_engine).
-        6) Optionally request human approval (placeholder utility).
-        7) Post the reply to X.
-        8) Log the interaction back to Google Sheets.
+        6) Route to human review (replies are posted manually via X Intent URL).
 
     Note:
         This function focuses on orchestration; several utilities are intentionally
@@ -42,7 +39,6 @@ def run_pipeline() -> None:
     sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_ACCOUNT_ID")
     spreadsheet_name = os.getenv("GOOGLE_SPREADSHEET_NAME", "Automation Config")
     sheet_client = GoogleSheetsClient(spreadsheet_name=spreadsheet_name, spreadsheet_id=sheet_id)
-    enable_posting = os.getenv("ENABLE_X_POSTING", "false").lower() == "true"
 
     profile_rows = sheet_client.read_records("profiles")
     keyword_rows = sheet_client.read_records("keywords")
@@ -65,16 +61,8 @@ def run_pipeline() -> None:
             reply_text = build_reply_text(template, post, matches)
 
             if requires_human_approval(post, reply_text):
-                # Placeholder: route to human review (Slack/Telegram/Sheets).
+                # Route to human review via Dashboard (manual reply via X Intent URL).
                 continue
-
-            if not enable_posting:
-                # Skip posting when disabled.
-                continue
-
-            response = post_reply(text=reply_text, in_reply_to_post_id=post.get("id", ""))
-            log_row = format_log_row(post, reply_text, response)
-            sheet_client.append_row("logs", log_row)
 
 
 # Placeholder utilities with docstrings for future implementation ----------------

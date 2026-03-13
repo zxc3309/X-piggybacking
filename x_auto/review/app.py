@@ -65,8 +65,7 @@ async def review_queue(request: Request, status: Optional[str] = None):
     except Exception as e:
         logger.error(f"Failed to load review queue: {e}", exc_info=True)
         items = []
-        stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0,
-                 "conversation_blocked": 0, "total": 0, "daily_sent": 0, "daily_limit": 17}
+        stats = {"pending": 0, "approved": 0, "rejected": 0, "total": 0}
 
     return templates.TemplateResponse("queue.html", {
         "request": request,

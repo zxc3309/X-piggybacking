@@ -2,9 +2,8 @@
 Manages the reply_queue Google Sheets worksheet for the review workflow.
 
 The reply_queue tracks AI-generated replies through their lifecycle:
-pending → approved → sent  (happy path)
-pending → rejected          (human rejects)
-approved → failed           (X API error)
+pending → approved  (human approves, then manually replies via X Intent URL)
+pending → rejected  (human rejects)
 
 Each row represents one reply candidate with its review status,
 original/edited text, and audit timestamps.
@@ -44,7 +43,7 @@ REPLY_QUEUE_HEADERS = [
     "views",
 ]
 
-VALID_STATUSES = {"pending", "approved", "rejected", "sent", "failed", "conversation_blocked"}
+VALID_STATUSES = {"pending", "approved", "rejected"}
 
 # Simple in-memory cache to avoid repeated Google Sheets API calls
 _cache: Dict[str, Any] = {"items": None, "timestamp": 0.0}
@@ -328,46 +327,12 @@ def reject_item(queue_id: str) -> bool:
     return update_item(queue_id, {"status": "rejected"})
 
 
-def mark_sent(queue_id: str) -> bool:
-    """Mark an item as sent after successful X API post."""
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    return update_item(queue_id, {"status": "sent", "sent_at": now})
-
-
-def mark_failed(queue_id: str, error_message: str) -> bool:
-    """Mark an item as failed with error details."""
-    return update_item(queue_id, {"status": "failed", "error_message": error_message})
-
-
-def mark_conversation_blocked(queue_id: str, error_message: str) -> bool:
-    """Mark an item as blocked by conversation control (won't be retried)."""
-    return update_item(queue_id, {"status": "conversation_blocked", "error_message": error_message})
-
-
-def get_daily_sent_count() -> int:
-    """Count how many replies were sent today (UTC)."""
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    items = get_all_items()
-    count = 0
-    for item in items:
-        if item.get("status") == "sent" and item.get("sent_at", "").startswith(today):
-            count += 1
-    return count
-
-
 def get_stats() -> Dict[str, int]:
-    """Return counts by status and daily sent count."""
+    """Return counts by status."""
     items = get_all_items()
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    stats = {"pending": 0, "approved": 0, "rejected": 0, "sent": 0, "failed": 0, "conversation_blocked": 0, "total": len(items)}
-    daily_sent = 0
+    stats = {"pending": 0, "approved": 0, "rejected": 0, "total": len(items)}
     for item in items:
         s = item.get("status", "")
         if s in stats:
             stats[s] += 1
-        if s == "sent" and item.get("sent_at", "").startswith(today):
-            daily_sent += 1
-
-    stats["daily_sent"] = daily_sent
-    stats["daily_limit"] = int(os.getenv("X_DAILY_REPLY_LIMIT", "17"))
     return stats

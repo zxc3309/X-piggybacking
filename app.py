@@ -47,7 +47,6 @@ async def lifespan(app: FastAPI):
 
     scheduler = XScraperScheduler(background_mode=True)
     scheduler.add_daily_scrape_job()
-    scheduler.add_reply_sender_job()  # Check approved replies every 5 min
     scheduler.start()
 
     status = scheduler.get_status()
@@ -172,8 +171,7 @@ async def get_status():
         "configuration": {
             "max_profile_urls": os.getenv("MAX_PROFILE_URLS", "0"),
             "post_results_limit": os.getenv("POST_RESULTS_LIMIT", "20"),
-            "lookback_days": os.getenv("LOOKBACK_DAYS", "1"),
-            "enable_x_posting": os.getenv("ENABLE_X_POSTING", "false")
+            "lookback_days": os.getenv("LOOKBACK_DAYS", "1")
         }
     }
 
