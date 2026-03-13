@@ -1,9 +1,8 @@
 """
-APScheduler configuration for daily X scraping tasks and reply queue processing.
+APScheduler configuration for daily X scraping tasks.
 
 This module manages scheduled execution of:
 - X scraper workflow (daily at configured time)
-- Reply queue auto-sender (every N minutes, default 5)
 """
 
 import os
@@ -11,7 +10,6 @@ import logging
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.interval import IntervalTrigger
 import pytz
 
 # Configure logging
@@ -28,14 +26,12 @@ class XScraperScheduler:
 
     Features:
         - Runs scraper daily at configured time (default: 08:00 Taiwan time)
-        - Runs reply auto-sender every N minutes (default: 5)
         - Uses BackgroundScheduler to run alongside web server
         - Supports Asia/Taipei timezone for scheduling
 
     Example:
         scheduler = XScraperScheduler()
         scheduler.add_daily_scrape_job()
-        scheduler.add_reply_sender_job()
         scheduler.start()
     """
 
@@ -53,12 +49,10 @@ class XScraperScheduler:
         # Get schedule from environment or use defaults
         self.schedule_hour = int(os.getenv("COLLECTION_SCHEDULE_HOUR", "8"))
         self.schedule_minute = int(os.getenv("COLLECTION_SCHEDULE_MINUTE", "0"))
-        self.reply_check_interval = int(os.getenv("REPLY_CHECK_INTERVAL_MIN", "5"))
 
         logger.info(
             f"Scheduler initialized with scrape schedule: "
-            f"{self.schedule_hour:02d}:{self.schedule_minute:02d} Asia/Taipei, "
-            f"reply check interval: {self.reply_check_interval}min"
+            f"{self.schedule_hour:02d}:{self.schedule_minute:02d} Asia/Taipei"
         )
 
     def add_daily_scrape_job(self):
@@ -83,25 +77,6 @@ class XScraperScheduler:
         logger.info(
             f"Daily scrape job scheduled at "
             f"{self.schedule_hour:02d}:{self.schedule_minute:02d} Asia/Taipei"
-        )
-
-    def add_reply_sender_job(self):
-        """
-        Add the reply queue auto-sender job to the scheduler.
-
-        Runs every N minutes (default 5) to check for approved replies
-        and post them via the X API.
-        """
-        self.scheduler.add_job(
-            func=self._execute_reply_sender,
-            trigger=IntervalTrigger(minutes=self.reply_check_interval),
-            id='reply_auto_sender',
-            name='Reply Queue Auto-Sender',
-            replace_existing=True
-        )
-
-        logger.info(
-            f"Reply auto-sender scheduled every {self.reply_check_interval} minutes"
         )
 
     def start(self):
@@ -177,19 +152,6 @@ class XScraperScheduler:
             logger.info("=" * 80)
             raise
 
-    def _execute_reply_sender(self):
-        """
-        Execute the reply queue auto-sender.
-
-        Checks for approved replies and sends them via the X API.
-        """
-        try:
-            from x_auto.review.auto_sender import check_and_send
-            check_and_send()
-        except Exception as e:
-            logger.error(f"Reply sender job failed: {e}", exc_info=True)
-
-
 def execute_scrape_job_sync():
     """
     Synchronous wrapper for manual execution.
@@ -228,7 +190,6 @@ if __name__ == "__main__":
         print("Starting scheduler in background mode...")
         scheduler = XScraperScheduler()
         scheduler.add_daily_scrape_job()
-        scheduler.add_reply_sender_job()
         scheduler.start()
 
         # Keep the process running
