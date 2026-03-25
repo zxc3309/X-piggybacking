@@ -340,85 +340,7 @@ def get_prompt(sheet_client: GoogleSheetsClient, sheet_name: str = "prompts") ->
     raise RuntimeError("No prompt found in the prompts sheet.")
 
 
-def call_chatgpt(
-    prompt: str,
-    content: str,
-    model: str = "gpt-5.2",
-    max_tokens: int = 50,
-) -> str:
-    """
-    Call the OpenAI Chat Completions API and return the model's content response.
-
-    Args:
-        prompt: Instruction describing acceptance criteria.
-        content: Post text to evaluate.
-        model: Model name to call.
-        max_tokens: Maximum tokens to generate in the response.
-
-    Returns:
-        Response content string.
-
-    Raises:
-        RuntimeError: If OPENAI_API_KEY is missing or the request fails.
-    """
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise RuntimeError("OPENAI_API_KEY is required for ChatGPT calls.")
-
-    # Strip whitespace and ensure proper encoding
-    api_key = api_key.strip()
-
-    # GPT-5.x models use max_completion_tokens instead of max_tokens
-    if model.startswith("gpt-5"):
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": content},
-            ],
-            "max_completion_tokens": max_tokens,
-        }
-    else:
-        body = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": content},
-            ],
-            "max_tokens": max_tokens,
-        }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json; charset=utf-8",
-    }
-
-    last_err = None
-    for attempt in range(3):
-        try:
-            resp = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                json=body, headers=headers, timeout=30,
-            )
-            if resp.status_code == 429:
-                wait = 2 ** attempt * 2  # 2s, 4s, 8s
-                print(f"[ChatGPT] Rate limited (429), waiting {wait}s (attempt {attempt+1}/3)")
-                time.sleep(wait)
-                continue
-            if not resp.ok:
-                raise RuntimeError(f"ChatGPT API error {resp.status_code}: {resp.text}")
-            data = resp.json()
-            return data["choices"][0]["message"]["content"].strip()
-        except requests.exceptions.Timeout:
-            last_err = f"Timeout after 30s (attempt {attempt+1}/3)"
-            print(f"[ChatGPT] {last_err}")
-            time.sleep(2 ** attempt)
-        except RuntimeError:
-            raise  # re-raise non-retryable errors (non-429 API errors)
-        except Exception as e:
-            last_err = str(e)
-            print(f"[ChatGPT] Error: {last_err} (attempt {attempt+1}/3)")
-            time.sleep(2 ** attempt)
-    raise RuntimeError(f"ChatGPT failed after 3 attempts: {last_err}")
+from x_auto.llm import call_llm as call_chatgpt  # backward-compatible alias
 
 
 def is_match_via_llm(prompt: str, post_text: str) -> bool:
@@ -454,7 +376,7 @@ def get_llm_decision_with_reason(prompt: str, post_text: str) -> Dict[str, Any]:
     )
 
     try:
-        reply = call_chatgpt(enhanced_prompt, post_text, model="gpt-5.2", max_tokens=80)
+        reply = call_chatgpt(enhanced_prompt, post_text, max_tokens=80)
         lines = reply.strip().split('\n', 1)
         first_line = lines[0].strip().lower()
         reason = lines[1].strip() if len(lines) > 1 else "No reason provided"
@@ -487,7 +409,7 @@ def generate_reply_recommendation(post_text: str, prompt: str) -> str:
         A short recommendation string suitable as a draft reply.
     """
     try:
-        recommendation = call_chatgpt(prompt, post_text, model="gpt-5.2", max_tokens=120)
+        recommendation = call_chatgpt(prompt, post_text, max_tokens=120)
         return recommendation.strip()
     except Exception:
         return "No recommendation generated."
@@ -505,7 +427,7 @@ def generate_post_summary(post_text: str, prompt: str) -> str:
         Brief summary (10-15 words) suitable as clickable link text
     """
     try:
-        summary = call_chatgpt(prompt, post_text, model="gpt-5.2", max_tokens=30)
+        summary = call_chatgpt(prompt, post_text, max_tokens=30)
         return summary.strip()
     except Exception as e:
         import logging
@@ -533,7 +455,7 @@ def categorize_post(post_text: str, prompt: str) -> str:
     )
 
     try:
-        reply = call_chatgpt(enhanced_prompt, post_text, model="gpt-5.2", max_tokens=10)
+        reply = call_chatgpt(enhanced_prompt, post_text, max_tokens=10)
         category = reply.strip().lower().replace(" ", "_")
 
         # Validation with fallback
