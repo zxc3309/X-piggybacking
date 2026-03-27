@@ -118,12 +118,13 @@ def send_telegram_message(message: str, parse_mode: str = ParseMode.HTML) -> boo
     return asyncio.run(_send_message_async(bot_token, chat_id, message, parse_mode))
 
 
-def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
+def format_posts_by_category(posts: List[Dict[str, Any]], llm_info: dict = None) -> str:
     """
     Format posts grouped by category with emojis and markdown links.
 
     Args:
         posts: List of post dictionaries with 'summary', 'category', and 'post_link'
+        llm_info: Optional dict with 'provider' and 'model' keys for footer display
 
     Returns:
         Formatted markdown message string
@@ -199,6 +200,11 @@ def format_posts_by_category(posts: List[Dict[str, Any]]) -> str:
 
     # Add footer
     message_parts.append("---")
+    if llm_info and llm_info.get("provider"):
+        model_display = llm_info.get("model", "default")
+        message_parts.append(
+            f"<i>Model: {escape_html(llm_info['provider'])} / {escape_html(model_display)}</i>"
+        )
     message_parts.append("<i>Powered by X-Piggybacking Analyzer</i>")
 
     return "\n".join(message_parts)
@@ -243,7 +249,7 @@ def split_message_if_needed(message: str, max_length: int = MAX_MESSAGE_LENGTH) 
     return parts
 
 
-def send_daily_summary(matched_posts: List[Dict[str, Any]]) -> bool:
+def send_daily_summary(matched_posts: List[Dict[str, Any]], llm_info: dict = None) -> bool:
     """
     Send daily summary of matched posts to Telegram.
 
@@ -254,6 +260,7 @@ def send_daily_summary(matched_posts: List[Dict[str, Any]]) -> bool:
 
     Args:
         matched_posts: List of post dictionaries with summary, category, and link
+        llm_info: Optional dict with 'provider' and 'model' for footer display
 
     Returns:
         True if all messages sent successfully, False otherwise
@@ -276,7 +283,7 @@ def send_daily_summary(matched_posts: List[Dict[str, Any]]) -> bool:
             return send_telegram_message(no_posts_message)
 
         # Format posts by category
-        formatted_message = format_posts_by_category(matched_posts)
+        formatted_message = format_posts_by_category(matched_posts, llm_info=llm_info)
 
         # Split if message is too long
         message_parts = split_message_if_needed(formatted_message)

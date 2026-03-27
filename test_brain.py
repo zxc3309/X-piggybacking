@@ -66,7 +66,7 @@ def main():
         check_connectivity(client)
         return
 
-    from x_auto.workflow.scrape_filter import call_chatgpt
+    from x_auto.llm import call_llm as call_chatgpt
 
     print(f"Brain API URL: {client.base_url}")
     print(f"Brain enabled: {client.enabled}")
