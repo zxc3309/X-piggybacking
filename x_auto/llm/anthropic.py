@@ -8,7 +8,7 @@ from .base import LLMProvider, retry_request
 
 class AnthropicProvider(LLMProvider):
 
-    default_model = "claude-sonnet-4-20250514"
+    default_model = "claude-sonnet-4-6"
 
     def __init__(self) -> None:
         self.api_key = (os.getenv("ANTHROPIC_API_KEY") or "").strip()
