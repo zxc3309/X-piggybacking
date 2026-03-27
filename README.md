@@ -6,6 +6,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 
 - **Profile monitoring** - Track X handles from Google Sheets
 - **Apify scraping** - Fetch recent posts via `scraper_one/x-profile-posts-scraper`
+- **Multi-AI provider support** - Switch between OpenAI, Anthropic Claude, Google Gemini via Google Sheet or env var
 - **AI-powered filtering** - LLM evaluates each post for relevance (decision recorded as 0/1)
 - **Post categorization** - Auto-categorize posts (token_analysis, industry_analysis, market_comment, etc.)
 - **Smart summaries** - Generate concise headlines for quick review
@@ -28,8 +29,10 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 | Service | Env Variable | How to Get |
 |---------|--------------|------------|
 | Apify | `APIFY_TOKEN` | [console.apify.com](https://console.apify.com/) > Settings > Integrations |
-| Google | `GOOGLE_SERVICE_ACCOUNT_PATH` | [Google Cloud Console](https://console.cloud.google.com/) > Service Account > JSON key |
+| Google Sheets | `GOOGLE_SERVICE_ACCOUNT_PATH` or `GOOGLE_SHEETS_CREDENTIALS_BASE64` | [Google Cloud Console](https://console.cloud.google.com/) > Service Account > JSON key |
 | OpenAI | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/) > API keys |
+| Anthropic | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com/) > API keys |
+| Google Gemini | `GOOGLE_API_KEY` | [aistudio.google.com](https://aistudio.google.com/) > API keys |
 | X API | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` | [developer.twitter.com](https://developer.twitter.com/) (only needed for posting) |
 | Telegram | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | [@BotFather](https://t.me/botfather) for token, [@userinfobot](https://t.me/userinfobot) for chat ID |
 | Second Brain | `BRAIN_API_URL`, `BRAIN_API_KEY` | Your cesecondbrain-api instance |
@@ -88,7 +91,7 @@ Google Sheets (Researcher)
    Apify Scraper ──────► Raw Posts
         │
         ▼
-   LLM Filter (OpenAI) ──► Scored Posts
+   LLM Filter (OpenAI/Claude/Gemini) ──► Scored Posts
         │
         ▼
    Categorizer + Reply Generator ◄── Second Brain (cesecondbrain-api)
@@ -113,6 +116,7 @@ Google Sheets (Researcher)
 - `x_auto/matcher` - Keyword detection, scoring, template selection
 - `x_auto/reply_engine` - Reply message construction
 - `x_auto/x_api` - X API client for posting replies
+- `x_auto/llm` - Multi-provider LLM abstraction (OpenAI, Anthropic, Google)
 - `x_auto/notifications` - Telegram bot integration for daily summaries
 - `x_auto/workflow` - End-to-end pipeline orchestration (scraping, filtering, LLM evaluation)
 - `x_auto/review` - Review dashboard and queue management
@@ -133,6 +137,7 @@ Google Sheets (Researcher)
 | `all_post` | `GOOGLE_WS_ALL_POST` | Output: All posts with LLM decisions (0/1) |
 | `scraped_output` | `GOOGLE_WS_SCRAPED_OUTPUT` | Output: Matched posts only (llm_decision=1) |
 | `reply_queue` | `GOOGLE_WS_REPLY_QUEUE` | Review queue for human approval |
+| `llm_config` | `GOOGLE_WS_LLM_CONFIG` | Runtime LLM provider/model switching |
 
 ### Worksheet Columns
 
@@ -162,15 +167,61 @@ Google Sheets (Researcher)
 
 ## Environment Variables
 
-### Required
+### Required - Google Sheets
 ```bash
 GOOGLE_SHEET_ID=your_google_sheet_id
-GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service_account.json
-APIFY_TOKEN=your_apify_token
-OPENAI_API_KEY=your_openai_api_key
+GOOGLE_SERVICE_ACCOUNT_PATH=/path/to/service_account.json        # Local development
+# GOOGLE_SHEETS_CREDENTIALS_BASE64=base64_encoded_json           # Railway/cloud deployment (alternative)
 ```
 
-### Google Sheets Worksheets
+### Required - AI/LLM
+```bash
+LLM_PROVIDER=openai                      # Options: openai, anthropic, google
+OPENAI_API_KEY=your_openai_api_key        # Required if LLM_PROVIDER=openai
+ANTHROPIC_API_KEY=your_anthropic_api_key  # Required if LLM_PROVIDER=anthropic
+GOOGLE_API_KEY=your_google_api_key        # Required if LLM_PROVIDER=google
+```
+
+> **Tip:** Set all three API keys in Railway so you can switch providers at any time via the `llm_config` Google Sheet worksheet without redeploying.
+
+#### Supported Models
+
+| Provider | Default Model | Other Options |
+|----------|--------------|---------------|
+| OpenAI | `gpt-5.4-mini` | `gpt-5.4`, `gpt-5.4-nano`, `gpt-5.2`, `o3`, `o4-mini`, `gpt-4.1`, `gpt-4o` |
+| Anthropic | `claude-sonnet-4-6` | `claude-opus-4-6`, `claude-haiku-4-5`, `claude-sonnet-4-20250514` |
+| Google | `gemini-2.5-pro` | `gemini-2.5-flash`, `gemini-2.0-flash` |
+
+#### Runtime Switching via Google Sheet
+
+Add a `llm_config` worksheet to your Google Sheet to switch provider/model without redeploying:
+
+| setting | value |
+|---------|-------|
+| provider | anthropic |
+| model | claude-sonnet-4-6 |
+
+The pipeline reads this at the start of each run. If the worksheet doesn't exist, it falls back to env vars.
+
+### Required - Apify
+```bash
+APIFY_TOKEN=your_apify_token
+APIFY_ACTOR_ID=scraper_one/x-profile-posts-scraper
+```
+
+### Required - Telegram
+```bash
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+### Optional - AI/LLM
+```bash
+LLM_MODEL=                                # Override default model (leave empty for provider default)
+GOOGLE_WS_LLM_CONFIG=llm_config           # LLM config worksheet name (default: llm_config)
+```
+
+### Optional - Google Sheets Worksheets
 ```bash
 GOOGLE_WS_PROFILES=Researcher
 GOOGLE_WS_PROMPTS=prompt_inuse
@@ -179,48 +230,44 @@ GOOGLE_WS_SCRAPED_OUTPUT=scraped_output
 GOOGLE_WS_REPLY_QUEUE=reply_queue
 ```
 
-### X API (for posting)
+### Optional - Scraping
+```bash
+MAX_PROFILE_URLS=0              # Max profiles to process (0 = all)
+POST_RESULTS_LIMIT=5            # Posts per profile
+LOOKBACK_DAYS=30                # Only fetch posts from last N days
+PROFILE_BATCH_START=0           # Batch start index
+PROFILE_BATCH_SIZE=0            # Batch size (0 = all)
+```
+
+### Optional - Scheduler
+```bash
+COLLECTION_SCHEDULE_HOUR=8      # Daily scrape time (Asia/Taipei)
+COLLECTION_SCHEDULE_MINUTE=0
+```
+
+### Optional - Telegram
+```bash
+ENABLE_TELEGRAM_NOTIFICATIONS=true
+REVIEW_DASHBOARD_URL=https://your-app.railway.app/dashboard  # For notification links
+```
+
+### Optional - Second Brain (cesecondbrain-api)
+```bash
+BRAIN_API_URL=https://brain.example.com   # Your cesecondbrain-api URL
+BRAIN_API_KEY=your_brain_api_key
+BRAIN_SEARCH_LIMIT=5                      # Max related notes to retrieve (default: 5)
+BRAIN_ENABLED=true                        # Set to "false" to disable
+```
+
+### Optional - X API (for posting)
 ```bash
 ENABLE_X_POSTING=false          # Set to "true" to enable live posting
 X_API_KEY=your_x_api_key
 X_API_SECRET=your_x_api_secret
 X_ACCESS_TOKEN=your_x_access_token
 X_ACCESS_TOKEN_SECRET=your_x_access_token_secret
-```
-
-### Auto-Sender
-```bash
 X_DAILY_REPLY_LIMIT=17          # X Free tier limit (default: 17)
 REPLY_CHECK_INTERVAL_MIN=5      # Check approved replies every N minutes
-```
-
-### Second Brain (cesecondbrain-api)
-```bash
-BRAIN_API_URL=https://brain.example.com   # Your cesecondbrain-api URL
-BRAIN_API_KEY=your_brain_api_key
-BRAIN_SEARCH_LIMIT=5                      # Max related notes to retrieve
-BRAIN_ENABLED=true                        # Set to "false" to disable
-```
-
-### Telegram
-```bash
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_CHAT_ID=your_chat_id
-ENABLE_TELEGRAM_NOTIFICATIONS=true
-REVIEW_DASHBOARD_URL=https://your-app.railway.app/dashboard  # For notification links
-```
-
-### Scraping
-```bash
-MAX_PROFILE_URLS=3              # Max profiles to process (0 = all)
-POST_RESULTS_LIMIT=3            # Posts per profile
-LOOKBACK_DAYS=30                # Only fetch posts from last N days
-```
-
-### Scheduler
-```bash
-COLLECTION_SCHEDULE_HOUR=8      # Daily scrape time (Asia/Taipei)
-COLLECTION_SCHEDULE_MINUTE=0
 ```
 
 ## Review Dashboard
@@ -341,6 +388,7 @@ Only one version per `prompt_name` can have `status="active"` at a time.
 
 ## Next Steps
 - Review and adjust LLM prompts in the `prompt_history` worksheet for optimal filtering
-- Monitor API costs and performance (Apify, OpenAI usage)
+- Set all three AI provider API keys to enable runtime switching via Google Sheet
+- Monitor API costs and performance (Apify, LLM usage)
 - Set `ENABLE_X_POSTING=true` when ready to post live replies to X
 - Configure `REVIEW_DASHBOARD_URL` for Telegram notification links
