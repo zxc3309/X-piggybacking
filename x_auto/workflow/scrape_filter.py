@@ -499,6 +499,45 @@ def get_content_provided() -> str:
     return "\n".join(content_lines)
 
 
+def get_llm_config_from_sheet() -> Dict[str, str]:
+    """Load LLM provider/model config from the ``llm_config`` worksheet.
+
+    The worksheet uses a simple key-value layout::
+
+        | setting  | value              |
+        |----------|--------------------|
+        | provider | anthropic          |
+        | model    | claude-sonnet-4-.. |
+
+    Returns:
+        Dict with optional ``provider`` and ``model`` keys.
+        Empty dict if the worksheet doesn't exist or has no data.
+    """
+    sheet_id = os.getenv("GOOGLE_SHEET_ID") or os.getenv("GOOGLE_X_PROMPTS_SHEET_ID")
+    if not sheet_id:
+        return {}
+
+    try:
+        ws_name = os.getenv("GOOGLE_WS_LLM_CONFIG", "llm_config")
+        client = GoogleSheetsClient(spreadsheet_name="llm_config", spreadsheet_id=sheet_id)
+        ws = client.get_sheet(ws_name)
+        records = ws.get_all_records()
+
+        config: Dict[str, str] = {}
+        for record in records:
+            setting = str(record.get("setting", "")).strip().lower()
+            value = str(record.get("value", "")).strip()
+            if setting and value:
+                config[setting] = value
+
+        if config:
+            print(f"[LLM Config] Loaded from sheet: {config}")
+        return config
+    except Exception as e:
+        print(f"[LLM Config] Could not read llm_config sheet (using env defaults): {e}")
+        return {}
+
+
 def get_prompts_from_sheet() -> Dict[str, str]:
     """
     Load prompts from prompt_history worksheet (single source of truth).
@@ -794,6 +833,16 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         f"processing {len(profile_urls)} (batch_start={batch_start}, batch_size={batch_size or 'all'}, "
         f"limit={max_profiles or 'all'})."
     )
+
+    # Load LLM provider/model config from sheet (overrides env defaults)
+    llm_sheet_config = get_llm_config_from_sheet()
+    if llm_sheet_config:
+        from x_auto.llm import configure
+        prov, mdl = configure(
+            provider=llm_sheet_config.get("provider", ""),
+            model=llm_sheet_config.get("model", ""),
+        )
+        print(f"[LLM Config] Active: provider={prov}, model={mdl}")
 
     # Build LLM prompts from the prompts sheet (or defaults).
     prompt_map = get_prompts_from_sheet()
@@ -1214,8 +1263,10 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     if os.getenv("ENABLE_TELEGRAM_NOTIFICATIONS", "true").lower() == "true":
         try:
             from x_auto.notifications.telegram_bot import send_daily_summary
+            from x_auto.llm import get_current_config
+            llm_info = get_current_config()
             print(f"\n[Telegram] Sending daily summary with {len(matched_with_profile)} posts...")
-            success = send_daily_summary(matched_with_profile)
+            success = send_daily_summary(matched_with_profile, llm_info=llm_info)
             if success:
                 print("[Telegram] Notification sent successfully")
             else:
