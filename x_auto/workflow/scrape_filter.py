@@ -919,7 +919,9 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     end_date = datetime.now(tz=timezone.utc)
     start_date = end_date - timedelta(days=lookback_days)
     start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
+    # Twitter's "until:" is exclusive (does not include that date),
+    # so add 1 day to ensure today's posts are included.
+    end_date_str = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
     # Extract handles from profile URLs for batch fetching
     handles = []
