@@ -937,12 +937,20 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     print(f"Date range: {start_date_str} to {end_date_str} ({lookback_days} day(s))")
     print(f"Handles: {', '.join(handles[:5])}{'...' if len(handles) > 5 else ''}")
 
-    all_posts = fetch_posts(
-        handles,
-        max_items=post_limit * len(handles),
-        start_date=start_date_str,
-        end_date=end_date_str
-    )
+    # Apify silently returns 0 results when searchTerms exceeds ~10-15 items.
+    # Split handles into chunks of 10 to stay within the limit.
+    APIFY_BATCH_SIZE = 10
+    all_posts = []
+    for i in range(0, len(handles), APIFY_BATCH_SIZE):
+        chunk = handles[i:i + APIFY_BATCH_SIZE]
+        chunk_posts = fetch_posts(
+            chunk,
+            max_items=post_limit * len(chunk),
+            start_date=start_date_str,
+            end_date=end_date_str
+        )
+        all_posts.extend(chunk_posts)
+        print(f"  Batch {i//APIFY_BATCH_SIZE + 1}: {len(chunk)} profiles → {len(chunk_posts)} posts")
     print(f"Fetched {len(all_posts)} posts within date range from batch query")
 
     # Group posts by author for processing
