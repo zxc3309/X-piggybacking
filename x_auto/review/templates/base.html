@@ -698,38 +698,34 @@
             .audit-key { font-size: 13px; }
             .audit-val { font-size: 14px; }
 
-            /* Review detail: single column with reordered sections */
+            /* Review detail: single column — Original post first on mobile */
             .review-layout {
                 grid-template-columns: 1fr;
-                gap: 16px;
+                gap: 12px;
             }
             .review-left {
                 position: static;
                 max-height: none;
                 overflow-y: visible;
-                order: 2; /* Original post below Brain + AI suggestions */
+                order: 1; /* Original post first */
             }
             .review-right {
-                order: 1; /* Brain + AI suggestions first on mobile */
+                order: 2; /* Brain + AI suggestions after original post */
             }
             /* Within review-right, Brain comes before AI suggestions */
             .review-right { display: flex; flex-direction: column; }
             .review-brain { order: 1; }
             .review-suggestions { order: 2; }
 
-            /* Reply composer */
+            /* Reply composer: compact */
             .reply-composer {
-                position: sticky;
-                bottom: 0;
-                background: var(--bg);
-                padding: 12px 0 16px;
-                margin-top: 0;
-                z-index: 50;
-                border-top: 1px solid var(--border);
+                padding: 10px 0 12px;
+                margin-top: 4px;
             }
             .edit-area {
-                min-height: 100px;
+                min-height: 60px;
                 font-size: 16px; /* prevent iOS zoom on focus */
+                padding: 8px 10px;
             }
 
             /* Suggestion box */
@@ -739,19 +735,21 @@
             /* Status bar: wrap nicely */
             .status-bar { gap: 8px; }
 
-            /* Composer actions: stack on mobile */
+            /* Composer actions: compact single row */
             .composer-actions {
-                flex-direction: column-reverse;
-                gap: 10px;
+                flex-direction: row;
+                gap: 6px;
+                margin-top: 8px;
             }
             .composer-actions > div {
                 display: flex;
-                gap: 8px;
+                gap: 6px;
             }
             .composer-actions .btn {
                 flex: 1;
                 justify-content: center;
-                padding: 12px 16px;
+                padding: 7px 8px;
+                font-size: 12px;
             }
         }
         @media (max-width: 480px) {
@@ -767,7 +765,7 @@
             .card-actions {
                 flex-direction: column;
             }
-            .btn { justify-content: center; width: 100%; }
+            .card-actions .btn { justify-content: center; width: 100%; }
 
             /* Quota badge: compact */
             .quota-badge { font-size: 13px; }
