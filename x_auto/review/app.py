@@ -67,13 +67,16 @@ async def review_queue(request: Request, status: Optional[str] = None):
         items = []
         stats = {"pending": 0, "approved": 0, "rejected": 0, "total": 0}
 
-    return templates.TemplateResponse("queue.html", {
-        "request": request,
-        "items": items,
-        "stats": stats,
-        "current_filter": status,
-        "prefix": _prefix(request),
-    })
+    return templates.TemplateResponse(
+        request,
+        "queue.html",
+        {
+            "items": items,
+            "stats": stats,
+            "current_filter": status,
+            "prefix": _prefix(request),
+        },
+    )
 
 
 @app.get("/review/{queue_id}", response_class=HTMLResponse)
@@ -93,13 +96,16 @@ async def review_detail(request: Request, queue_id: str):
     reply_text = item.get("edited_reply") or item.get("original_reply") or ""
     char_count = len(reply_text)
 
-    return templates.TemplateResponse("review.html", {
-        "request": request,
-        "item": item,
-        "stats": stats,
-        "char_count": char_count,
-        "prefix": _prefix(request),
-    })
+    return templates.TemplateResponse(
+        request,
+        "review.html",
+        {
+            "item": item,
+            "stats": stats,
+            "char_count": char_count,
+            "prefix": _prefix(request),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
