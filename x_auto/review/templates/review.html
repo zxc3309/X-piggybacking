@@ -136,34 +136,47 @@
 </div><!-- /review-layout -->
 
 <!-- Reply Composer (full width, bottom) -->
-<div class="reply-composer" id="reply-composer">
-    <div class="section-label">Your Reply</div>
-    <textarea
-        class="edit-area"
-        id="edited-reply"
-        name="edited_reply"
-        placeholder="Edit the reply here, or leave empty to use AI suggestion..."
-    >{{ item.edited_reply }}</textarea>
-
-    <!-- Char counter (informational) -->
-    <div class="char-bar-wrap">
-        <div class="char-bar-label" id="char-counter">
-            <span id="char-count">{{ item.edited_reply | length }}</span> chars
-        </div>
+<div class="reply-composer collapsed" id="reply-composer">
+    <div class="composer-toggle" id="composer-toggle" onclick="toggleComposer()">
+        <div class="section-label">Your Reply</div>
+        <span class="composer-toggle-icon">▼</span>
     </div>
+    <div class="composer-body">
+        <textarea
+            class="edit-area"
+            id="edited-reply"
+            name="edited_reply"
+            placeholder="Edit the reply here, or leave empty to use AI suggestion..."
+        >{{ item.edited_reply }}</textarea>
 
-    <!-- Action buttons -->
-    <div class="composer-actions">
-        <div>
-            <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
+        <!-- Char counter (informational) -->
+        <div class="char-bar-wrap">
+            <div class="char-bar-label" id="char-counter">
+                <span id="char-count">{{ item.edited_reply | length }}</span> chars
+            </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-            <button type="button" id="copy-btn" class="btn btn-copy">Copy</button>
-            <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
-            <button type="button" id="reply-on-x-btn" class="btn btn-approve">Reply on X ↗</button>
+
+        <!-- Action buttons -->
+        <div class="composer-actions">
+            <div>
+                <button type="button" id="reject-btn" class="btn btn-reject">Reject</button>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" id="copy-btn" class="btn btn-copy">Copy</button>
+                <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
+                <button type="button" id="reply-on-x-btn" class="btn btn-approve">Reply on X ↗</button>
+            </div>
         </div>
     </div>
 </div>
+<div class="composer-spacer"></div>
+
+<!-- Floating button to open composer (mobile) -->
+<button class="composer-fab" id="composer-fab" onclick="toggleComposer()" title="Open reply editor">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+</button>
 
 {% endblock %}
 
@@ -173,6 +186,16 @@
     const counter = document.getElementById('char-count');
     const QUEUE_ID = '{{ item.queue_id }}';
     const POST_ID = '{{ item.post_id or "" }}';
+    const composerEl = document.getElementById('reply-composer');
+    const fabEl = document.getElementById('composer-fab');
+
+    function toggleComposer() {
+        const isCollapsed = composerEl.classList.toggle('collapsed');
+        fabEl.style.display = isCollapsed ? 'flex' : 'none';
+        if (!isCollapsed) {
+            textarea.focus();
+        }
+    }
 
     function updateCounter() {
         const len = textarea.value.length;
@@ -187,6 +210,10 @@
     }
 
     function scrollToComposer() {
+        // Open composer if collapsed
+        if (composerEl.classList.contains('collapsed')) {
+            toggleComposer();
+        }
         document.getElementById('reply-composer').scrollIntoView({ behavior: 'smooth', block: 'center' });
         textarea.focus();
     }

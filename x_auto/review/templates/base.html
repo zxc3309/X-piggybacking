@@ -623,6 +623,13 @@
             padding: 20px 0 32px;
             margin-top: 8px;
         }
+        .reply-composer.collapsed .composer-body {
+            display: none;
+        }
+        .composer-body {}
+        .composer-toggle {
+            display: none; /* hidden on desktop, shown on mobile */
+        }
         .composer-actions {
             display: flex;
             gap: 8px;
@@ -630,6 +637,28 @@
             justify-content: space-between;
             flex-wrap: wrap;
         }
+        /* Floating composer FAB (mobile only) */
+        .composer-fab {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            cursor: pointer;
+            z-index: 60;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+            transition: transform 0.2s, background 0.2s;
+        }
+        .composer-fab:hover { background: var(--accent-hover); }
+        .composer-fab:active { transform: scale(0.92); }
+        .composer-fab svg { width: 22px; height: 22px; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
@@ -698,38 +727,68 @@
             .audit-key { font-size: 13px; }
             .audit-val { font-size: 14px; }
 
-            /* Review detail: single column with reordered sections */
+            /* Review detail: single column — Original post first on mobile */
             .review-layout {
                 grid-template-columns: 1fr;
-                gap: 16px;
+                gap: 12px;
             }
             .review-left {
                 position: static;
                 max-height: none;
                 overflow-y: visible;
-                order: 2; /* Original post below Brain + AI suggestions */
+                order: 1; /* Original post first */
             }
             .review-right {
-                order: 1; /* Brain + AI suggestions first on mobile */
+                order: 2; /* Brain + AI suggestions after original post */
             }
             /* Within review-right, Brain comes before AI suggestions */
             .review-right { display: flex; flex-direction: column; }
             .review-brain { order: 1; }
             .review-suggestions { order: 2; }
 
-            /* Reply composer */
+            /* Reply composer: collapsible panel */
             .reply-composer {
-                position: sticky;
+                position: fixed;
                 bottom: 0;
+                left: 0;
+                right: 0;
                 background: var(--bg);
-                padding: 12px 0 16px;
+                padding: 12px 16px 16px;
                 margin-top: 0;
-                z-index: 50;
-                border-top: 1px solid var(--border);
+                z-index: 55;
+                border-top: 2px solid var(--accent);
+                box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+                transform: translateY(0);
+                transition: transform 0.3s ease;
             }
+            .reply-composer.collapsed {
+                transform: translateY(100%);
+                pointer-events: none;
+            }
+            .composer-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: pointer;
+                margin-bottom: 8px;
+            }
+            .composer-toggle .section-label { margin-bottom: 0; }
+            .composer-toggle-icon {
+                font-size: 18px;
+                color: var(--text-secondary);
+                transition: transform 0.2s;
+            }
+            .reply-composer.collapsed .composer-toggle-icon { transform: rotate(180deg); }
+            .composer-fab { display: flex; }
+            .reply-composer:not(.collapsed) ~ .composer-fab,
+            .reply-composer:not(.collapsed) + .composer-fab { display: none; }
+            /* Spacer so page content isn't hidden behind fixed composer */
+            .composer-spacer { height: 56px; }
+
             .edit-area {
-                min-height: 100px;
-                font-size: 16px; /* prevent iOS zoom on focus */
+                min-height: 60px;
+                font-size: 16px;
+                padding: 8px 10px;
             }
 
             /* Suggestion box */
@@ -739,19 +798,21 @@
             /* Status bar: wrap nicely */
             .status-bar { gap: 8px; }
 
-            /* Composer actions: stack on mobile */
+            /* Composer actions: compact single row */
             .composer-actions {
-                flex-direction: column-reverse;
-                gap: 10px;
+                flex-direction: row;
+                gap: 6px;
+                margin-top: 8px;
             }
             .composer-actions > div {
                 display: flex;
-                gap: 8px;
+                gap: 6px;
             }
             .composer-actions .btn {
                 flex: 1;
                 justify-content: center;
-                padding: 12px 16px;
+                padding: 7px 8px;
+                font-size: 12px;
             }
         }
         @media (max-width: 480px) {
@@ -767,7 +828,7 @@
             .card-actions {
                 flex-direction: column;
             }
-            .btn { justify-content: center; width: 100%; }
+            .card-actions .btn { justify-content: center; width: 100%; }
 
             /* Quota badge: compact */
             .quota-badge { font-size: 13px; }
