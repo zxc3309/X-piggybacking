@@ -33,6 +33,7 @@
             background: var(--bg);
             color: var(--text);
             line-height: 1.5;
+            overflow-x: hidden;
         }
 
         .container {
@@ -464,7 +465,7 @@
         }
 
         /* ── Post content rich rendering ── */
-        .post-content { white-space: pre-wrap; line-height: 1.7; font-size: 15px; }
+        .post-content { white-space: pre-wrap; line-height: 1.7; font-size: 15px; overflow-wrap: break-word; }
         .post-mention { color: var(--accent); text-decoration: none; }
         .post-mention:hover { text-decoration: underline; }
         .post-hashtag { color: var(--accent); opacity: 0.8; }
@@ -479,6 +480,8 @@
             border-left: 3px solid var(--brain);
             border-radius: 2px;
             padding: 16px;
+            overflow-wrap: break-word;
+            word-break: break-word;
         }
         .brain-panel .section-label { color: var(--brain); }
         .brain-panel h2, .brain-panel h3 {
@@ -524,7 +527,7 @@
             border-radius: 10px;
             font-size: 12px;
             font-weight: 500;
-            white-space: nowrap;
+            white-space: normal;
         }
 
         /* ── Engagement metrics ── */
