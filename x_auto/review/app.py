@@ -25,11 +25,27 @@ from typing import Optional
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from x_auto.review import queue_manager
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Reply Review Dashboard")
+
+
+class CacheHeaderMiddleware(BaseHTTPMiddleware):
+    """Set Cache-Control headers for browser caching of HTML pages."""
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        content_type = response.headers.get("content-type", "")
+        if request.method == "GET" and "text/html" in content_type:
+            response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=20"
+        elif request.method == "GET" and "application/json" in content_type:
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+app.add_middleware(CacheHeaderMiddleware)
 
 # Templates directory
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -52,8 +68,9 @@ async def index(request: Request):
 
 
 @app.get("/review", response_class=HTMLResponse)
-async def review_queue(request: Request, status: Optional[str] = None):
+async def review_queue(request: Request, status: Optional[str] = None, page: int = 1):
     """Show the review queue list, optionally filtered by status."""
+    per_page = 20
     try:
         if status and status in queue_manager.VALID_STATUSES:
             items = queue_manager.get_items_by_status(status)
@@ -67,6 +84,13 @@ async def review_queue(request: Request, status: Optional[str] = None):
         items = []
         stats = {"pending": 0, "approved": 0, "rejected": 0, "total": 0}
 
+    # Reverse once server-side (newest first) and paginate
+    items = list(reversed(items))
+    total_items = len(items)
+    total_pages = max(1, (total_items + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    items = items[(page - 1) * per_page : page * per_page]
+
     return templates.TemplateResponse(
         request,
         "queue.html",
@@ -75,6 +99,9 @@ async def review_queue(request: Request, status: Optional[str] = None):
             "stats": stats,
             "current_filter": status,
             "prefix": _prefix(request),
+            "page": page,
+            "total_pages": total_pages,
+            "total_items": total_items,
         },
     )
 

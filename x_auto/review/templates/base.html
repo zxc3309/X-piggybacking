@@ -4,8 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Reply Review{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"></noscript>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
         :root {
             --bg: #0d0c0b;
@@ -46,8 +49,7 @@
         .header {
             position: sticky;
             top: 0;
-            background: rgba(13, 12, 11, 0.92);
-            backdrop-filter: blur(12px);
+            background: rgba(13, 12, 11, 0.97);
             border-bottom: 1px solid var(--border);
             z-index: 100;
             padding: 12px 0;
@@ -763,6 +765,7 @@
                 box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
                 transform: translateY(0);
                 transition: transform 0.3s ease;
+                will-change: transform;
             }
             .reply-composer.collapsed {
                 transform: translateY(100%);
@@ -782,7 +785,7 @@
                 transition: transform 0.2s;
             }
             .reply-composer.collapsed .composer-toggle-icon { transform: rotate(180deg); }
-            .composer-fab { display: flex; }
+            .composer-fab { display: flex; will-change: transform; }
             .reply-composer:not(.collapsed) ~ .composer-fab,
             .reply-composer:not(.collapsed) + .composer-fab { display: none; }
             /* Spacer so page content isn't hidden behind fixed composer */
@@ -836,6 +839,29 @@
             /* Quota badge: compact */
             .quota-badge { font-size: 13px; }
             .quota-bar-track { width: 48px; }
+        }
+
+        /* ── Pagination ── */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 20px 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .pagination a {
+            color: var(--accent);
+            text-decoration: none;
+            padding: 6px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .pagination a:hover {
+            background: var(--surface-2);
+            border-color: var(--accent);
         }
     </style>
 </head>
@@ -1049,13 +1075,16 @@
         }
 
         // Apply renderPostContent to all .post-content elements on page load
+        // Batched: separate read phase from write phase to avoid layout thrashing
         document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.post-content[data-raw]').forEach(function(el) {
-                el.innerHTML = renderPostContent(el.dataset.raw);
-            });
-            document.querySelectorAll('.brain-content[data-raw]').forEach(function(el) {
-                el.innerHTML = renderBrainMarkdown(el.dataset.raw);
-            });
+            var postEls = document.querySelectorAll('.post-content[data-raw]');
+            var brainEls = document.querySelectorAll('.brain-content[data-raw]');
+            var postData = [];
+            var brainData = [];
+            postEls.forEach(function(el) { postData.push({el: el, html: renderPostContent(el.dataset.raw)}); });
+            brainEls.forEach(function(el) { brainData.push({el: el, html: renderBrainMarkdown(el.dataset.raw)}); });
+            postData.forEach(function(d) { d.el.innerHTML = d.html; });
+            brainData.forEach(function(d) { d.el.innerHTML = d.html; });
         });
     </script>
     {% block scripts %}{% endblock %}

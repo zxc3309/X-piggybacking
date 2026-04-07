@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
 
 from scheduler import XScraperScheduler, execute_scrape_job_sync
@@ -71,6 +72,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Enable GZip compression for all responses (70-80% transfer size reduction)
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Mount the review dashboard under /dashboard
 app.mount("/dashboard", review_app)
