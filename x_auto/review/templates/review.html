@@ -334,6 +334,7 @@
 
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
+        if (!e.metaKey && !e.ctrlKey && e.key !== 'Escape') return;
         // Cmd+Enter or Ctrl+Enter = Reply on X
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();

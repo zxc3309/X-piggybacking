@@ -19,7 +19,7 @@
 </nav>
 
 {% if items %}
-    {% for item in items | reverse %}
+    {% for item in items %}
     <div class="card" data-status="{{ item.status }}">
         <div class="card-header">
             <div class="card-meta">
@@ -87,6 +87,18 @@
         </div>
     </div>
     {% endfor %}
+
+    {% if total_pages > 1 %}
+    <nav class="pagination">
+        {% if page > 1 %}
+        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page - 1 }}">← Prev</a>
+        {% endif %}
+        <span>Page {{ page }} / {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page + 1 }}">Next →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
 {% else %}
     <div class="empty-state">
         <div class="empty-state-icon">[ --- ]</div>
