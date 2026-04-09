@@ -1,0 +1,547 @@
+{% extends "base.html" %}
+{% block title %}Researchers — Reply Review{% endblock %}
+
+{% block content %}
+<style>
+    .researcher-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 0 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .researcher-toolbar h2 {
+        font-family: 'Syne', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+    }
+    .researcher-count {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-left: 8px;
+    }
+
+    /* ── Add form ── */
+    .add-form-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--green);
+        border-radius: 2px;
+        padding: 16px;
+        margin-bottom: 16px;
+        display: none;
+    }
+    .add-form-wrap.visible { display: block; }
+    .add-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+    }
+    .form-group input {
+        width: 100%;
+        padding: 7px 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        color: var(--text);
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+
+    /* ── Table ── */
+    .researcher-table-wrap {
+        overflow-x: auto;
+        margin: 0 -16px;
+        padding: 0 16px;
+    }
+    .researcher-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+    .researcher-table th {
+        text-align: left;
+        padding: 10px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+    }
+    .researcher-table td {
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--border);
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .researcher-table tbody tr:hover {
+        background: var(--surface);
+    }
+    .researcher-table a {
+        color: var(--accent);
+        text-decoration: none;
+    }
+    .researcher-table a:hover { text-decoration: underline; }
+
+    /* Inline edit inputs */
+    .researcher-table td input.inline-edit {
+        width: 100%;
+        padding: 4px 6px;
+        background: var(--bg);
+        border: 1px solid var(--accent);
+        border-radius: 2px;
+        color: var(--text);
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .actions-cell {
+        white-space: nowrap;
+        display: flex;
+        gap: 4px;
+    }
+
+    /* ── Button variants ── */
+    .btn-add {
+        background: var(--green);
+        color: #0d0c0b;
+        font-weight: 700;
+    }
+    .btn-add:hover { background: var(--green-hover); }
+    .btn-toggle-add {
+        background: transparent;
+        color: var(--green);
+        border: 1px solid var(--green);
+    }
+    .btn-toggle-add:hover { background: rgba(94, 201, 122, 0.08); }
+    .btn-edit {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        padding: 3px 10px;
+        font-size: 12px;
+    }
+    .btn-edit:hover { background: var(--surface-2); color: var(--text); }
+    .btn-inline-save {
+        background: var(--green);
+        color: #0d0c0b;
+        font-weight: 700;
+        padding: 3px 10px;
+        font-size: 12px;
+    }
+    .btn-inline-cancel {
+        background: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        padding: 3px 10px;
+        font-size: 12px;
+    }
+
+    /* ── Company chips ── */
+    .company-chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .company-chip {
+        font-size: 11px;
+        padding: 2px 8px;
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        color: var(--text-secondary);
+    }
+    .company-chip strong {
+        color: var(--text);
+        margin-left: 4px;
+    }
+
+    /* ── Toast ── */
+    .toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: var(--surface);
+        border: 1px solid var(--green);
+        color: var(--green);
+        padding: 10px 20px;
+        border-radius: 2px;
+        font-size: 13px;
+        font-family: 'JetBrains Mono', monospace;
+        z-index: 200;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.2s, transform 0.2s;
+        pointer-events: none;
+    }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    .toast.error { border-color: var(--red); color: var(--red); }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+        .researcher-table-wrap { margin: 0; padding: 0; }
+        .researcher-table thead { display: none; }
+        .researcher-table tbody tr {
+            display: block;
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--border);
+            border-radius: 2px;
+            margin: 8px 0;
+            padding: 12px;
+            background: var(--surface);
+        }
+        .researcher-table tbody tr:hover { background: var(--surface-2); }
+        .researcher-table td {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border: none;
+            max-width: none;
+            white-space: normal;
+        }
+        .researcher-table td::before {
+            content: attr(data-label);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            min-width: 90px;
+            flex-shrink: 0;
+        }
+        .researcher-table td:last-child::before { content: ''; }
+        .actions-cell { justify-content: flex-end; }
+        .add-form-grid { grid-template-columns: 1fr; }
+        .researcher-toolbar { flex-direction: column; align-items: flex-start; }
+        .btn { padding: 10px 16px; font-size: 15px; }
+        .btn-edit, .btn-inline-save, .btn-inline-cancel { padding: 6px 14px; font-size: 14px; }
+    }
+</style>
+
+<!-- Toolbar -->
+<div class="researcher-toolbar">
+    <h2>Researchers<span class="researcher-count">{{ total_items }} total</span></h2>
+    <button class="btn btn-toggle-add" onclick="toggleAddForm()">+ Add Researcher</button>
+</div>
+
+<!-- Company chips -->
+{% if stats.companies %}
+<div class="company-chips">
+    {% for company, count in stats.companies.items() %}
+    <span class="company-chip">{{ company }}<strong>{{ count }}</strong></span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Add form -->
+<div class="add-form-wrap" id="add-form">
+    <div class="add-form-grid">
+        <div class="form-group">
+            <label>Company</label>
+            <input type="text" id="add-company" placeholder="e.g. Delphi">
+        </div>
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="add-name" placeholder="e.g. John Doe">
+        </div>
+        <div class="form-group">
+            <label>Role</label>
+            <input type="text" id="add-role" placeholder="e.g. Research">
+        </div>
+        <div class="form-group">
+            <label>Handle</label>
+            <input type="text" id="add-handle" placeholder="e.g. @johndoe">
+        </div>
+        <div class="form-group">
+            <label>X Link</label>
+            <input type="text" id="add-x_link" placeholder="https://x.com/johndoe">
+        </div>
+        <div class="form-group">
+            <label>LinkedIn</label>
+            <input type="text" id="add-linkedin" placeholder="https://linkedin.com/in/...">
+        </div>
+        <div class="form-group">
+            <label>Coverage</label>
+            <input type="text" id="add-coverage" placeholder="e.g. Solana, DeFi">
+        </div>
+        <div class="form-group">
+            <label>Telegram</label>
+            <input type="text" id="add-telegram" placeholder="e.g. @handle">
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <button class="btn btn-add btn-sm" onclick="addResearcher(this)">Add</button>
+        <button class="btn btn-inline-cancel btn-sm" onclick="toggleAddForm()">Cancel</button>
+    </div>
+</div>
+
+<!-- Table -->
+{% if items %}
+<div class="researcher-table-wrap">
+<table class="researcher-table">
+    <thead>
+        <tr>
+            <th>Company</th>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Handle</th>
+            <th>X Link</th>
+            <th>LinkedIn</th>
+            <th>Coverage</th>
+            <th>Telegram</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for item in items %}
+        {% set company = item.get("Company", "") %}
+        {% set name = item.get("Name", "") %}
+        {% set role = item.get("Role", "") %}
+        {% set handle = item.get("Handle", "") or item.get("handle", "") %}
+        {% set x_link = item.get("X (link)", "") or item.get("X(link)", "") %}
+        {% set linkedin = item.get("LinkedIn (link)", "") or item.get("LinkedIn", "") %}
+        {% set coverage = item.get("Coverage", "") %}
+        {% set telegram = item.get("Telegram", "") %}
+        <tr data-row="{{ item._row_index }}" id="row-{{ item._row_index }}">
+            <td data-label="Company" data-field="company">{{ company }}</td>
+            <td data-label="Name" data-field="name">{{ name }}</td>
+            <td data-label="Role" data-field="role">{{ role }}</td>
+            <td data-label="Handle" data-field="handle">
+                {% if handle %}
+                <a href="https://x.com/{{ handle.lstrip('@') }}" target="_blank" rel="noopener">{{ handle }}</a>
+                {% endif %}
+            </td>
+            <td data-label="X Link" data-field="x_link">
+                {% if x_link %}
+                <a href="{{ x_link }}" target="_blank" rel="noopener">{{ x_link | truncate(30) }}</a>
+                {% endif %}
+            </td>
+            <td data-label="LinkedIn" data-field="linkedin">
+                {% if linkedin %}
+                <a href="{{ linkedin }}" target="_blank" rel="noopener">{{ linkedin | truncate(30) }}</a>
+                {% endif %}
+            </td>
+            <td data-label="Coverage" data-field="coverage">{{ coverage }}</td>
+            <td data-label="Telegram" data-field="telegram">{{ telegram }}</td>
+            <td data-label="">
+                <div class="actions-cell">
+                    <button class="btn btn-edit" onclick="editRow({{ item._row_index }})">Edit</button>
+                </div>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{% if total_pages > 1 %}
+<nav class="pagination">
+    {% if page > 1 %}
+    <a href="{{ prefix }}/researchers?page={{ page - 1 }}">&#8592; Prev</a>
+    {% endif %}
+    <span>Page {{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="{{ prefix }}/researchers?page={{ page + 1 }}">Next &#8594;</a>
+    {% endif %}
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+    <div class="empty-state-icon">[ --- ]</div>
+    <h2>No researchers found</h2>
+    <p>Add researchers using the button above. They will be used for X profile scraping.</p>
+</div>
+{% endif %}
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const FIELDS = ['company', 'name', 'role', 'handle', 'x_link', 'linkedin', 'coverage', 'telegram'];
+    let editingRow = null;
+
+    function showToast(msg, isError) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast visible' + (isError ? ' error' : '');
+        setTimeout(() => { t.className = 'toast'; }, 2500);
+    }
+
+    function toggleAddForm() {
+        document.getElementById('add-form').classList.toggle('visible');
+    }
+
+    async function addResearcher(btn) {
+        const data = {};
+        let hasValue = false;
+        FIELDS.forEach(f => {
+            const val = document.getElementById('add-' + f).value.trim();
+            data[f] = val;
+            if (val) hasValue = true;
+        });
+
+        if (!hasValue) { showToast('Please fill in at least one field', true); return; }
+
+        btn.disabled = true;
+        btn.textContent = 'Adding...';
+
+        try {
+            const res = await fetch(API_PREFIX + '/api/researchers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (res.ok && result.success) {
+                showToast('Researcher added');
+                // Reload page to show new data
+                setTimeout(() => location.reload(), 500);
+            } else {
+                throw new Error(result.error || 'Failed to add');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, true);
+            btn.disabled = false;
+            btn.textContent = 'Add';
+        }
+    }
+
+    function editRow(rowIndex) {
+        // Cancel any existing edit
+        if (editingRow !== null) cancelEdit(editingRow);
+
+        editingRow = rowIndex;
+        const tr = document.getElementById('row-' + rowIndex);
+        if (!tr) return;
+
+        const cells = tr.querySelectorAll('td[data-field]');
+        cells.forEach(td => {
+            const field = td.dataset.field;
+            // Get raw text value
+            const link = td.querySelector('a');
+            let value = '';
+            if (link) {
+                if (field === 'handle') {
+                    value = td.textContent.trim();
+                } else {
+                    value = link.getAttribute('href') || '';
+                }
+            } else {
+                value = td.textContent.trim();
+            }
+            td.dataset.original = value;
+            td.innerHTML = '<input class="inline-edit" type="text" value="' + escapeAttr(value) + '" data-field="' + field + '">';
+        });
+
+        // Replace Edit button with Save/Cancel
+        const actionsCell = tr.querySelector('.actions-cell');
+        actionsCell.innerHTML =
+            '<button class="btn btn-inline-save" onclick="saveRow(' + rowIndex + ', this)">Save</button>' +
+            '<button class="btn btn-inline-cancel" onclick="cancelEdit(' + rowIndex + ')">Cancel</button>';
+    }
+
+    function cancelEdit(rowIndex) {
+        const tr = document.getElementById('row-' + rowIndex);
+        if (!tr) return;
+
+        const cells = tr.querySelectorAll('td[data-field]');
+        cells.forEach(td => {
+            const value = td.dataset.original || '';
+            const field = td.dataset.field;
+            td.innerHTML = renderCellValue(field, value);
+        });
+
+        // Restore Edit button
+        const actionsCell = tr.querySelector('.actions-cell');
+        actionsCell.innerHTML = '<button class="btn btn-edit" onclick="editRow(' + rowIndex + ')">Edit</button>';
+        editingRow = null;
+    }
+
+    async function saveRow(rowIndex, btn) {
+        const tr = document.getElementById('row-' + rowIndex);
+        if (!tr) return;
+
+        const updates = {};
+        const inputs = tr.querySelectorAll('input.inline-edit');
+        inputs.forEach(inp => {
+            updates[inp.dataset.field] = inp.value.trim();
+        });
+
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const res = await fetch(API_PREFIX + '/api/researchers/' + rowIndex, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+            const result = await res.json();
+            if (res.ok && result.success) {
+                // Update cells with new values
+                const cells = tr.querySelectorAll('td[data-field]');
+                cells.forEach(td => {
+                    const field = td.dataset.field;
+                    const value = updates[field] || '';
+                    td.innerHTML = renderCellValue(field, value);
+                });
+
+                // Restore Edit button
+                const actionsCell = tr.querySelector('.actions-cell');
+                actionsCell.innerHTML = '<button class="btn btn-edit" onclick="editRow(' + rowIndex + ')">Edit</button>';
+                editingRow = null;
+                showToast('Saved');
+            } else {
+                throw new Error(result.error || 'Failed to save');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, true);
+            btn.disabled = false;
+            btn.textContent = 'Save';
+        }
+    }
+
+    function renderCellValue(field, value) {
+        if (!value) return '';
+        if (field === 'handle') {
+            const clean = value.replace(/^@/, '');
+            return '<a href="https://x.com/' + escapeAttr(clean) + '" target="_blank" rel="noopener">' + escapeHTML(value) + '</a>';
+        }
+        if (field === 'x_link' || field === 'linkedin') {
+            const display = value.length > 30 ? value.substring(0, 27) + '...' : value;
+            return '<a href="' + escapeAttr(value) + '" target="_blank" rel="noopener">' + escapeHTML(display) + '</a>';
+        }
+        return escapeHTML(value);
+    }
+
+    function escapeHTML(s) {
+        return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function escapeAttr(s) {
+        return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+</script>
+{% endblock %}
