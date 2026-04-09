@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import time
 from typing import Optional
 import requests
 
@@ -72,6 +73,36 @@ class BrainClient:
         self.limit = int(os.getenv("BRAIN_SEARCH_LIMIT", "5"))
         self.enabled = os.getenv("BRAIN_ENABLED", "true").lower() == "true"
 
+    def _search_notes(self, sanitized_query: str) -> Optional[dict]:
+        """Search brain API with retry (up to 3 attempts)."""
+        last_err = None
+        for attempt in range(3):
+            try:
+                resp = requests.post(
+                    f"{self.base_url}/search",
+                    json={
+                        "query": sanitized_query,
+                        "mode": "hybrid",
+                        "limit": self.limit,
+                        "include_linked": True,
+                        "link_depth": 1,
+                    },
+                    headers={"X-API-Key": self.api_key, "Content-Type": "application/json"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except requests.exceptions.Timeout:
+                last_err = f"Timeout after 15s (attempt {attempt + 1}/3)"
+                print(f"   [Brain] {last_err}")
+            except Exception as e:
+                last_err = str(e)
+                print(f"   [Brain] Search error: {last_err} (attempt {attempt + 1}/3)")
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+        print(f"   [Brain] Search failed after 3 attempts: {last_err}")
+        return None
+
     def get_note_context(self, post_text: str, call_llm_fn) -> Optional[dict]:
         """
         1. Call POST /search to get related notes
@@ -79,54 +110,47 @@ class BrainClient:
         Returns: {"brain_context": str, "total": int} or None
         """
         if not self.enabled:
-            logger.warning("[Brain] Disabled (BRAIN_ENABLED != true)")
+            print("   [Brain] Disabled (BRAIN_ENABLED != true)")
             return None
         if not self.base_url or not self.api_key:
-            logger.warning(
-                "[Brain] Missing config: url=%s key=%s",
-                "SET" if self.base_url else "MISSING",
-                "SET" if self.api_key else "MISSING",
+            print(
+                f"   [Brain] Missing config: url={'SET' if self.base_url else 'MISSING'} "
+                f"key={'SET' if self.api_key else 'MISSING'}"
             )
             return None
+
+        # Sanitize query: remove punctuation that may break FTS5 on server
+        sanitized = re.sub(r"[.,;:!?\-\—\–\"'`()\[\]{}/\\]", " ", post_text[:500])
+        sanitized = re.sub(r"\s+", " ", sanitized).strip()
+
+        # Step 1: Search brain API (with retry)
+        data = self._search_notes(sanitized)
+        if data is None:
+            return None
+
+        results = data.get("results", [])
+        if not results:
+            print(f"   [Brain] No matching notes for: {post_text[:80]}")
+            return None
+
+        print(f"   [Brain] Found {len(results)} notes, generating context...")
+
+        # Step 2: Build notes context and call LLM for analysis
+        notes_context = _build_notes_context(results)
+        analysis_prompt = BRAIN_ANALYSIS_PROMPT.format(notes_context=notes_context)
+
         try:
-            # Sanitize query: remove punctuation that may break FTS5 on server
-            sanitized = re.sub(r"[.,;:!?\-\—\–\"'`()\[\]{}/\\]", " ", post_text[:500])
-            sanitized = re.sub(r"\s+", " ", sanitized).strip()
-            resp = requests.post(
-                f"{self.base_url}/search",
-                json={
-                    "query": sanitized,
-                    "mode": "hybrid",
-                    "limit": self.limit,
-                    "include_linked": True,
-                    "link_depth": 1,
-                },
-                headers={"X-API-Key": self.api_key, "Content-Type": "application/json"},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            results = data.get("results", [])
-            if not results:
-                logger.info("[Brain] No matching notes for: %s", post_text[:80])
-                return None
-
-            logger.info("[Brain] Found %d notes, generating context...", len(results))
-            # Build notes context for LLM
-            notes_context = _build_notes_context(results)
-            analysis_prompt = BRAIN_ANALYSIS_PROMPT.format(notes_context=notes_context)
-
-            # Call LLM to generate rich analysis
             brain_context = call_llm_fn(
                 prompt=analysis_prompt,
                 content=post_text[:1000],
                 max_tokens=8192,
+                timeout=90,
             )
-
             return {
                 "brain_context": brain_context.strip(),
                 "total": data.get("total", len(results)),
             }
         except Exception as e:
-            logger.error(f"Brain API failed for query (first 80 chars): {post_text[:80]!r}: {e}")
+            print(f"   [Brain] LLM analysis failed: {e}")
+            logger.error("[Brain] LLM analysis failed: %s", e)
             return None

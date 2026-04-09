@@ -13,7 +13,7 @@ class LLMProvider(ABC):
     default_model: str = ""
 
     @abstractmethod
-    def call(self, prompt: str, content: str, model: str, max_tokens: int) -> str:
+    def call(self, prompt: str, content: str, model: str, max_tokens: int, *, timeout: int = 60) -> str:
         """Send a system prompt + user content to the LLM and return response text."""
         ...
 
@@ -24,7 +24,7 @@ def retry_request(
     headers: dict,
     body: dict,
     *,
-    timeout: int = 30,
+    timeout: int = 60,
     retries: int = 3,
     provider_name: str = "LLM",
 ) -> requests.Response:

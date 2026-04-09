@@ -17,7 +17,7 @@ class GoogleProvider(LLMProvider):
                 "GOOGLE_API_KEY is required when LLM_PROVIDER=google"
             )
 
-    def call(self, prompt: str, content: str, model: str, max_tokens: int) -> str:
+    def call(self, prompt: str, content: str, model: str, max_tokens: int, *, timeout: int = 60) -> str:
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/"
             f"models/{model}:generateContent?key={self.api_key}"
@@ -39,6 +39,7 @@ class GoogleProvider(LLMProvider):
         headers = {"Content-Type": "application/json"}
         resp = retry_request(
             "POST", url, headers, body,
+            timeout=timeout,
             provider_name="Google",
         )
         data = resp.json()

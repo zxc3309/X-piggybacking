@@ -1033,6 +1033,8 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                     if brain_result and brain_result.get("total", 0) > 0:
                         brain_context = brain_result.get("brain_context", "")
                         print(f"   [Brain] Found {brain_result['total']} related notes")
+                    elif brain_result is None:
+                        print(f"   [Brain] FAILED for post: {text[:80]}")
 
                     # Enrich reply prompt with note context if available
                     enriched_reply_prompt = reply_prompt

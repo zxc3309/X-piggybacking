@@ -88,6 +88,7 @@ def call_llm(
     content: str,
     model: str = "",
     max_tokens: int = 50,
+    timeout: int = 60,
 ) -> str:
     """Drop-in replacement for the old ``call_chatgpt`` function.
 
@@ -95,7 +96,7 @@ def call_llm(
     """
     provider = get_provider()
     effective_model = model or provider.default_model
-    return provider.call(prompt, content, effective_model, max_tokens)
+    return provider.call(prompt, content, effective_model, max_tokens, timeout=timeout)
 
 
 # Backward-compatible alias

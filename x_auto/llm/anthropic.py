@@ -17,7 +17,7 @@ class AnthropicProvider(LLMProvider):
                 "ANTHROPIC_API_KEY is required when LLM_PROVIDER=anthropic"
             )
 
-    def call(self, prompt: str, content: str, model: str, max_tokens: int) -> str:
+    def call(self, prompt: str, content: str, model: str, max_tokens: int, *, timeout: int = 60) -> str:
         body = {
             "model": model,
             "max_tokens": max_tokens,
@@ -35,6 +35,7 @@ class AnthropicProvider(LLMProvider):
             "POST",
             "https://api.anthropic.com/v1/messages",
             headers, body,
+            timeout=timeout,
             provider_name="Anthropic",
         )
         data = resp.json()

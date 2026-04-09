@@ -18,7 +18,7 @@ class OpenAIProvider(LLMProvider):
         if not self.api_key:
             raise RuntimeError("OPENAI_API_KEY is required when LLM_PROVIDER=openai")
 
-    def call(self, prompt: str, content: str, model: str, max_tokens: int) -> str:
+    def call(self, prompt: str, content: str, model: str, max_tokens: int, *, timeout: int = 60) -> str:
         # GPT-5.x and o-series reasoning models use max_completion_tokens
         token_param = (
             "max_completion_tokens"
@@ -41,6 +41,7 @@ class OpenAIProvider(LLMProvider):
             "POST",
             "https://api.openai.com/v1/chat/completions",
             headers, body,
+            timeout=timeout,
             provider_name="OpenAI",
         )
         data = resp.json()
