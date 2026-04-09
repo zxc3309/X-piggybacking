@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from x_auto.review import queue_manager
+from x_auto.review import researcher_manager
 
 logger = logging.getLogger(__name__)
 
@@ -268,5 +269,83 @@ async def api_save(request: Request, queue_id: str):
             {"success": False, "error": "Item not found"},
             status_code=404
         )
+
+    return JSONResponse({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Researcher Management
+# ---------------------------------------------------------------------------
+
+@app.get("/researchers", response_class=HTMLResponse)
+async def researchers_list(request: Request, page: int = 1):
+    """Show the researcher list with inline add/edit."""
+    per_page = 50
+    try:
+        items = researcher_manager.get_all_researchers()
+        stats = researcher_manager.get_stats()
+        headers = researcher_manager.get_headers()
+    except Exception as e:
+        logger.error(f"Failed to load researchers: {e}", exc_info=True)
+        items = []
+        stats = {"total": 0, "companies": {}}
+        headers = []
+
+    total_items = len(items)
+    total_pages = max(1, (total_items + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    items = items[(page - 1) * per_page : page * per_page]
+
+    return templates.TemplateResponse(
+        request,
+        "researchers.html",
+        {
+            "items": items,
+            "stats": stats,
+            "headers": headers,
+            "prefix": _prefix(request),
+            "page": page,
+            "total_pages": total_pages,
+            "total_items": total_items,
+        },
+    )
+
+
+@app.post("/api/researchers")
+async def api_add_researcher(request: Request):
+    """Add a new researcher via AJAX."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "Invalid JSON"}, status_code=400)
+
+    try:
+        success = researcher_manager.add_researcher(data)
+    except Exception as e:
+        logger.error(f"API: Failed to add researcher: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse({"success": False, "error": "Failed to add"}, status_code=500)
+
+    return JSONResponse({"success": True})
+
+
+@app.put("/api/researchers/{row_index}")
+async def api_update_researcher(request: Request, row_index: int):
+    """Update a researcher via AJAX."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"success": False, "error": "Invalid JSON"}, status_code=400)
+
+    try:
+        success = researcher_manager.update_researcher(row_index, data)
+    except Exception as e:
+        logger.error(f"API: Failed to update researcher row {row_index}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse({"success": False, "error": "Row not found"}, status_code=404)
 
     return JSONResponse({"success": True})

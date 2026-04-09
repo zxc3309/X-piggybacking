@@ -869,6 +869,10 @@
     <header class="header">
         <div class="container header-inner">
             <h1><a href="{{ prefix }}/review">Reply Review</a></h1>
+            <nav style="display:flex;gap:16px;font-size:13px;">
+                <a href="{{ prefix }}/review" style="color:var(--text-secondary);text-decoration:none;">Queue</a>
+                <a href="{{ prefix }}/researchers" style="color:var(--text-secondary);text-decoration:none;">Researchers</a>
+            </nav>
             {% block header_right %}{% endblock %}
         </div>
     </header>
