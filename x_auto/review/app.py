@@ -349,3 +349,18 @@ async def api_update_researcher(request: Request, row_index: int):
         return JSONResponse({"success": False, "error": "Row not found"}, status_code=404)
 
     return JSONResponse({"success": True})
+
+
+@app.delete("/api/researchers/{row_index}")
+async def api_delete_researcher(row_index: int):
+    """Delete a researcher via AJAX."""
+    try:
+        success = researcher_manager.delete_researcher(row_index)
+    except Exception as e:
+        logger.error(f"API: Failed to delete researcher row {row_index}: {e}", exc_info=True)
+        return JSONResponse({"success": False, "error": str(e)}, status_code=500)
+
+    if not success:
+        return JSONResponse({"success": False, "error": "Row not found"}, status_code=404)
+
+    return JSONResponse({"success": True})

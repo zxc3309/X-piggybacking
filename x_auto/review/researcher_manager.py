@@ -221,6 +221,29 @@ def update_researcher(row_index: int, updates: Dict[str, str]) -> bool:
     return True
 
 
+def delete_researcher(row_index: int) -> bool:
+    """Delete a researcher by removing their row from the worksheet.
+
+    Args:
+        row_index: 1-based gspread row number.
+
+    Returns:
+        True if found and deleted.
+    """
+    ws_name = _get_ws_name()
+    client = _get_client()
+    ws = client.get_sheet(ws_name)
+
+    rows = ws.get_all_values()
+    if len(rows) <= 1 or row_index < 2 or row_index > len(rows):
+        return False
+
+    ws.delete_rows(row_index)
+    logger.info(f"Deleted researcher at row {row_index}")
+    _invalidate_cache()
+    return True
+
+
 def get_stats() -> Dict[str, Any]:
     """Return total count and count by company."""
     items = get_all_researchers()
