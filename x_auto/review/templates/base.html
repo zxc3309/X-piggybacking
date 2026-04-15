@@ -628,9 +628,6 @@
             padding: 20px 0 32px;
             margin-top: 8px;
         }
-        .reply-composer.collapsed .composer-body {
-            display: none;
-        }
         .composer-body {}
         .composer-toggle {
             display: none; /* hidden on desktop, shown on mobile */
@@ -770,6 +767,9 @@
             .reply-composer.collapsed {
                 transform: translateY(100%);
                 pointer-events: none;
+            }
+            .reply-composer.collapsed .composer-body {
+                display: none;
             }
             .composer-toggle {
                 display: flex;
