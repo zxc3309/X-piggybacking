@@ -13,6 +13,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 - **Reply generation** - AI-powered reply recommendations
 - **Question recommendations** - Suggested follow-up questions for engagement
 - **Review Dashboard** - Web UI for approve/reject/edit reply candidates
+- **Public demo page** - Embeddable single-post dashboard at `/demo` running a real X post (@karpathy's "LLM Knowledge Bases" thread) through the full pipeline; the "Reply on X" button opens the native X composer via `intent/tweet?in_reply_to=...` so visitors can actually reply (LLM reasoning, Second Brain notes, and drafted reply are pre-computed — no API calls fire from the page)
 - **Auto-sender** - Posts approved replies to X with daily limits (17/day for X Free tier)
 - **Second Brain integration** - Query personal knowledge base (cesecondbrain-api) for related notes, enrich replies with your own perspective
 - **Telegram notifications** - Daily summaries organized by category with emoji indicators
@@ -58,6 +59,7 @@ python app.py
 # Start web server with scheduler and review dashboard
 python app.py
 # Dashboard available at: http://localhost:8080/dashboard
+# Public demo (mock data, embeddable iframe): http://localhost:8080/demo
 
 # Run scrape workflow only (no server)
 python main.py
@@ -81,6 +83,7 @@ python scripts/update_prompt.py
 | `/trigger` | POST | Manually trigger scrape job |
 | `/status` | GET | Scheduler status and config |
 | `/dashboard/` | GET | Review dashboard (mounted app) |
+| `/demo/` | GET | Single-post demo dashboard (embeddable iframe; real X post + real reply intent link, no API calls fire from page) |
 
 ## Architecture
 
@@ -120,6 +123,7 @@ Google Sheets (Researcher)
 - `x_auto/notifications` - Telegram bot integration for daily summaries
 - `x_auto/workflow` - End-to-end pipeline orchestration (scraping, filtering, LLM evaluation)
 - `x_auto/review` - Review dashboard and queue management
+- `x_auto/demo` - Public single-post demo dashboard at `/demo` (pre-computed pipeline output for one real X post; the "Reply on X" button uses `x.com/intent/tweet` so visitors can send a real reply from X's native composer)
 - `x_auto/brain` - Second Brain (cesecondbrain-api) client for knowledge base search
 - `x_auto/feedback` - Prompt version management and feedback analysis
 - `x_auto/utils` - Shared helpers (logging, rate limiting, ID tracking)

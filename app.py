@@ -18,6 +18,7 @@ import uvicorn
 
 from scheduler import XScraperScheduler, execute_scrape_job_sync
 from x_auto.review.app import app as review_app
+from x_auto.demo.app import app as demo_app
 
 # Configure logging
 logging.basicConfig(
@@ -78,6 +79,9 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 # Mount the review dashboard under /dashboard
 app.mount("/dashboard", review_app)
 
+# Mount the public static demo under /demo (mock data, embeddable iframe)
+app.mount("/demo", demo_app)
+
 
 @app.get("/")
 async def root():
@@ -88,6 +92,8 @@ async def root():
         "endpoints": {
             "health": "/health",
             "trigger": "/trigger (POST)",
+            "dashboard": "/dashboard",
+            "demo": "/demo",
             "docs": "/docs"
         }
     }

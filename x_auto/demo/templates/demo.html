@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X Auto-Reply · Live Demo</title>
+<meta name="description" content="A real post from @karpathy, run through the pipeline. See the LLM reasoning, retrieved Second Brain notes, and the drafted reply — then click Reply on X to open the real composer.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root {
+    --bg: #faf8f4;
+    --bg-alt: #f3efe7;
+    --surface: #ffffff;
+    --surface-2: #fbf9f5;
+    --border: #e8e2d5;
+    --border-strong: #d4ccb8;
+    --text: #1a1814;
+    --text-secondary: #6b6559;
+    --text-muted: #9a9485;
+    --accent: #e8a03c;
+    --accent-dark: #c7861f;
+    --accent-soft: #fbeccb;
+    --green: #3b9e5c;
+    --green-soft: #e1f1e5;
+    --red: #c74444;
+    --red-soft: #f5dede;
+    --blue: #4a9ead;
+    --blue-soft: #e0eef1;
+    --purple: #9868b8;
+    --purple-soft: #efe5f5;
+    --shadow-sm: 0 1px 2px rgba(26, 24, 20, 0.04);
+    --shadow-md: 0 4px 16px rgba(26, 24, 20, 0.06);
+    --shadow-lg: 0 12px 40px rgba(26, 24, 20, 0.10);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+}
+.wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+/* ──────── Top bar ──────── */
+.topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 0;
+}
+.topbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Fraunces', Georgia, serif;
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    text-decoration: none;
+}
+.brand-dot {
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.brand-meta {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding-left: 12px;
+    margin-left: 4px;
+    border-left: 1px solid var(--border);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    padding: 6px 11px;
+    border-radius: 999px;
+}
+.chip-live {
+    background: #fff;
+    color: var(--green);
+    border-color: var(--green-soft);
+    font-weight: 600;
+}
+.chip-live::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 2px var(--green-soft);
+    animation: livepulse 1.8s ease-in-out infinite;
+}
+@keyframes livepulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+/* ──────── Dashboard strip ──────── */
+.strip {
+    background: var(--bg-alt);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 0;
+}
+.strip-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.strip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 0.02em;
+}
+.strip-title span {
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-left: 6px;
+}
+.strip-note {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.strip-note strong {
+    color: var(--accent-dark);
+    font-weight: 600;
+}
+
+/* ──────── Main review layout ──────── */
+.main {
+    padding: 32px 0 80px;
+}
+.review {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+.panel-stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+/* Reply composer spans full width */
+.composer-panel { grid-column: 1 / -1; }
+
+/* ──────── Left column: the real post ──────── */
+.post-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px 30px;
+    box-shadow: var(--shadow-md);
+    max-width: 680px;
+}
+.post-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.post-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c9b79a, #6b6559);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 16px;
+    text-transform: uppercase;
+}
+.post-author {
+    flex: 1;
+    min-width: 0;
+}
+.post-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.2;
+}
+.post-name svg {
+    width: 16px;
+    height: 16px;
+    color: #1d9bf0;
+    flex-shrink: 0;
+}
+.post-handle {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.3;
+    margin-top: 2px;
+}
+.post-handle a {
+    color: inherit;
+    text-decoration: none;
+}
+.post-handle a:hover { color: var(--text-secondary); }
+.x-logo {
+    width: 22px;
+    height: 22px;
+    color: var(--text);
+    flex-shrink: 0;
+}
+
+.post-bio {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-left: 2px solid var(--border-strong);
+    border-radius: 4px 8px 8px 4px;
+    line-height: 1.5;
+}
+
+.post-body {
+    font-size: 15.5px;
+    line-height: 1.62;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    position: relative;
+}
+.post-body.collapsed {
+    max-height: 260px;
+    overflow: hidden;
+}
+.post-body.collapsed::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to bottom, transparent, var(--surface));
+    pointer-events: none;
+}
+.post-body .kb-heading {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 17px;
+    margin-top: 2px;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+}
+.expand-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 0;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-dark);
+    cursor: pointer;
+    text-align: center;
+    transition: color 0.15s;
+}
+.expand-btn:hover { color: var(--text); }
+
+.post-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 18px 0 14px;
+    padding: 14px 0 0;
+    border-top: 1px solid var(--border);
+}
+.post-meta .dot { opacity: 0.5; }
+
+.post-engagement {
+    display: flex;
+    gap: 24px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+.eng-stat {
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.eng-stat strong {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 18px;
+    color: var(--text);
+    letter-spacing: -0.01em;
+}
+.eng-stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* ──────── Right column: pipeline output ──────── */
+/* panel-stack layout is defined above with sticky positioning */
+
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow-sm);
+}
+.panel:hover { box-shadow: var(--shadow-md); }
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+.panel-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.panel-label .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    border-radius: 50%;
+    font-family: 'Fraunces', serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+}
+.panel-pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+}
+
+/* LLM decision panel */
+.reasoning {
+    font-size: 14.5px;
+    line-height: 1.62;
+    color: var(--text);
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border-radius: 10px;
+    border-left: 3px solid var(--accent);
+    font-style: italic;
+}
+.confidence-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+.confidence-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-alt);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+.confidence-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+    border-radius: 3px;
+    transition: width 0.6s ease-out;
+}
+.confidence-value {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--accent-dark);
+    letter-spacing: -0.01em;
+}
+
+/* Category panel */
+.category-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--purple-soft);
+    color: var(--purple);
+}
+.category-note {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+/* Second Brain panel */
+.brain-heading {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.brain-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 4px;
+}
+.brain-note {
+    background: linear-gradient(to right, var(--blue-soft) 0%, var(--surface-2) 40%);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--blue);
+    border-radius: 4px 12px 12px 4px;
+    padding: 14px 18px;
+    transition: transform 0.15s;
+}
+.brain-note:hover {
+    transform: translateX(2px);
+}
+.brain-note-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.brain-note-relevance {
+    font-family: 'Fraunces', serif;
+    font-size: 12px;
+    color: var(--blue);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.brain-note-source {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    font-family: 'Fraunces', serif;
+    font-style: italic;
+}
+.brain-note-snippet {
+    font-size: 13.5px;
+    line-height: 1.58;
+    color: var(--text-secondary);
+}
+
+/* Reply composer */
+.composer-panel {
+    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--surface) 18%);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    border-radius: 16px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow-md);
+}
+.composer-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.composer-label-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.composer-label-text .step-num {
+    background: var(--accent);
+    color: white;
+}
+.regen-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 7px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.regen-btn:hover {
+    color: var(--accent-dark);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+.regen-btn.spin svg { animation: spin 0.7s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.composer-field {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+.composer-field label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+}
+.composer-field textarea {
+    width: 100%;
+    min-height: 140px;
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    resize: vertical;
+    outline: none;
+}
+.composer-field-q textarea { min-height: 70px; }
+.composer-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 4px;
+}
+.composer-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.composer-count.over { color: var(--red); font-weight: 600; }
+
+.send-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 18px;
+    flex-wrap: wrap;
+}
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+    padding: 13px 22px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+.btn-primary {
+    background: #000;
+    color: white;
+    flex: 1;
+    min-width: 180px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+}
+.btn-primary:hover {
+    background: #1a1814;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+.btn-primary svg {
+    width: 16px;
+    height: 16px;
+}
+.btn-secondary {
+    background: var(--surface);
+    color: var(--text-secondary);
+    border-color: var(--border-strong);
+}
+.btn-secondary:hover {
+    color: var(--red);
+    border-color: var(--red-soft);
+    background: var(--red-soft);
+}
+
+.send-hint {
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.55;
+    text-align: center;
+}
+.send-hint strong { color: var(--text-secondary); font-weight: 600; }
+
+.send-hint.done {
+    color: var(--green);
+    font-weight: 500;
+}
+
+/* Pipeline trace (tiny row above panels) */
+.pipeline-trace {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 20px;
+    padding: 10px 0;
+    overflow-x: auto;
+}
+.trace-step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.trace-step + .trace-step::before {
+    content: '→';
+    color: var(--text-muted);
+    margin: 0 10px;
+    font-size: 13px;
+}
+.trace-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: var(--green-soft);
+    color: var(--green);
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Fraunces', serif;
+}
+.trace-step.current .trace-icon {
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 0 0 4px var(--accent-soft);
+}
+.trace-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+.trace-step.current .trace-label { color: var(--text); }
+
+/* ──────── Footer ──────── */
+.footer {
+    padding: 40px 0 64px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    background: var(--bg-alt);
+}
+.disclaimer {
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 18px 24px;
+    font-size: 14px;
+    line-height: 1.62;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+.disclaimer strong { color: var(--text); font-weight: 700; }
+.footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 13.5px;
+    color: var(--text-muted);
+}
+.footer-row a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+}
+.footer-row a:hover { color: var(--text); }
+.footer-row a + a { margin-left: 20px; }
+
+/* ──────── Responsive ──────── */
+@media (max-width: 960px) {
+    .panel-stack { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .wrap { padding: 0 16px; }
+    .post-card { padding: 22px 20px; border-radius: 14px; }
+    .panel { padding: 18px 20px; border-radius: 14px; }
+    .composer-panel { padding: 18px 20px; }
+    .main { padding: 20px 0 48px; }
+    .strip-inner { flex-direction: column; align-items: flex-start; }
+    .brand-meta { display: none; }
+    .post-engagement { gap: 16px; }
+    .eng-stat strong { font-size: 16px; }
+    .topbar-actions .chip { display: none; }
+    .topbar-actions .chip-live { display: inline-flex; }
+}
+</style>
+</head>
+<body>
+
+<!-- ──────── Top bar ──────── -->
+<header class="topbar">
+    <div class="wrap topbar-inner">
+        <a href="#" class="brand">
+            <span class="brand-dot"></span>
+            X Auto-Reply
+            <span class="brand-meta">Interactive Demo</span>
+        </a>
+        <div class="topbar-actions">
+            <span class="chip chip-live">Live pipeline trace</span>
+            <span class="chip">Mock · no posting</span>
+        </div>
+    </div>
+</header>
+
+<!-- ──────── Strip ──────── -->
+<div class="strip">
+    <div class="wrap strip-inner">
+        <div class="strip-title">
+            Reply queue <span>· 1 item ready for review</span>
+        </div>
+        <div class="strip-note">
+            Click <strong>Reply on X</strong> to open the real composer for this post →
+        </div>
+    </div>
+</div>
+
+<!-- ──────── Main dashboard ──────── -->
+<main class="main">
+    <div class="wrap">
+
+        <!-- Pipeline trace -->
+        <nav class="pipeline-trace" id="pipeline-trace"></nav>
+
+        <div class="review">
+
+            <!-- Left: the real X post -->
+            <article class="post-card">
+                <div class="post-head">
+                    <div class="post-avatar">AK</div>
+                    <div class="post-author">
+                        <div class="post-name">
+                            <span id="post-name">Andrej Karpathy</span>
+                            <svg viewBox="0 0 22 22" fill="currentColor" aria-label="Verified"><path d="M20.396 11c-.018-.646-.215-1.275-.57-1.816-.354-.54-.852-.972-1.438-1.246.223-.607.27-1.264.14-1.897-.131-.634-.437-1.218-.882-1.687-.47-.445-1.053-.75-1.687-.882-.633-.13-1.29-.083-1.897.14-.273-.587-.704-1.086-1.245-1.44S11.647 1.62 11 1.604c-.646.017-1.273.213-1.813.568s-.969.854-1.24 1.44c-.608-.223-1.267-.272-1.902-.14-.635.13-1.22.436-1.69.882-.445.47-.749 1.055-.878 1.688-.13.633-.08 1.29.144 1.896-.587.274-1.087.705-1.443 1.245-.356.54-.555 1.17-.574 1.817.02.647.218 1.276.574 1.817.356.54.856.972 1.443 1.245-.224.606-.274 1.263-.144 1.896.13.634.433 1.218.877 1.688.47.443 1.054.747 1.687.878.633.132 1.29.084 1.897-.136.274.586.705 1.084 1.246 1.439.54.354 1.17.551 1.816.569.647-.016 1.276-.213 1.817-.567s.972-.854 1.245-1.44c.604.239 1.266.296 1.903.164.636-.132 1.22-.447 1.68-.907.46-.46.776-1.044.908-1.681s.075-1.299-.165-1.903c.586-.274 1.084-.705 1.439-1.246.354-.54.551-1.17.569-1.816zM9.662 14.85l-3.429-3.428 1.293-1.302 2.072 2.072 4.4-4.794 1.347 1.246z"/></svg>
+                        </div>
+                        <div class="post-handle">
+                            <a href="https://x.com/karpathy" target="_blank" rel="noopener">@karpathy</a>
+                        </div>
+                    </div>
+                    <a href="https://x.com/karpathy/status/2039805659525644595" target="_blank" rel="noopener" title="Open on X" style="color: var(--text-muted); text-decoration: none;">
+                        <svg class="x-logo" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    </a>
+                </div>
+
+                <div class="post-bio" id="post-bio"></div>
+                <div class="post-body collapsed" id="post-body"></div>
+                <button type="button" class="expand-btn" id="expand-btn">Show full post ↓</button>
+
+                <div class="post-meta">
+                    <span id="post-date"></span>
+                </div>
+
+                <div class="post-engagement" id="post-engagement"></div>
+            </article>
+
+            <!-- Right: pipeline output -->
+            <div class="panel-stack">
+
+                <!-- Second Brain panel -->
+                <section class="panel">
+                    <div class="panel-header">
+                        <div class="panel-label">
+                            <span class="step-num">2</span> Second Brain retrieval
+                        </div>
+                        <span class="panel-pill" style="background: var(--blue-soft); color: var(--blue);">3 notes matched</span>
+                    </div>
+                    <div class="brain-list" id="brain-list"></div>
+                </section>
+
+                <!-- Reply composer -->
+                <section class="composer-panel">
+                    <div class="composer-label">
+                        <div class="composer-label-text">
+                            <span class="step-num">3</span> Drafted reply
+                        </div>
+                        <button type="button" class="regen-btn" id="regen-btn">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                            Regenerate
+                        </button>
+                    </div>
+
+                    <div class="composer-field">
+                        <label>Reply</label>
+                        <textarea id="reply-textarea"></textarea>
+                        <div class="composer-foot">
+                            <span class="composer-count" id="reply-count">0</span>
+                        </div>
+                    </div>
+
+                    <div class="composer-field composer-field-q">
+                        <label>Alternative: question framing</label>
+                        <textarea id="question-textarea"></textarea>
+                    </div>
+
+                    <div class="send-row">
+                        <a class="btn btn-primary" id="reply-x-btn" href="#" target="_blank" rel="noopener">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            Reply on X ↗
+                        </a>
+                        <button type="button" class="btn btn-secondary" id="reject-btn">Reject</button>
+                    </div>
+
+                    <div class="send-hint" id="send-hint">
+                        Clicking <strong>Reply on X</strong> opens X's native reply composer for this real post, pre-filled with the drafted text. Review it there before hitting Reply — nothing is sent from this page.
+                    </div>
+                </section>
+
+            </div><!-- /panel-stack -->
+        </div><!-- /review -->
+    </div>
+</main>
+
+<!-- ──────── Footer ──────── -->
+<footer class="footer">
+    <div class="wrap">
+        <div class="disclaimer">
+            <strong>This is a live demo of a real tool.</strong> The X post above is real — clicking Reply on X will open the actual composer on x.com. Everything else on this page (the LLM reasoning, the Second Brain notes, the drafted reply) is pre-computed output from when the pipeline ran on this post. The real tool runs privately on a daily schedule against a list of profiles the operator follows.
+        </div>
+        <div class="footer-row">
+            <div>Built by <a href="https://cebillhsu.xyz" target="_blank" rel="noopener">Bill Hsu</a></div>
+            <div>
+                <a href="https://cebillhsu.xyz" target="_blank" rel="noopener">cebillhsu.xyz</a>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- Fixtures -->
+<script type="application/json" id="demo-data">{{ demo_data_json | safe }}</script>
+
+<!-- App -->
+<script>
+(function () {
+    'use strict';
+
+    const DATA = JSON.parse(document.getElementById('demo-data').textContent);
+    const ITEM = DATA.item;
+    const CATS = DATA.categories;
+    const PIPELINE = DATA.pipeline;
+
+    const esc = (str) => String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    // ── Pipeline trace strip ──
+    (function renderTrace() {
+        const el = document.getElementById('pipeline-trace');
+        el.innerHTML = PIPELINE.map((step, i) => {
+            const current = step.id === 'review';
+            return `
+                <div class="trace-step ${current ? 'current' : ''}">
+                    <span class="trace-icon">${current ? '•' : '✓'}</span>
+                    <span class="trace-label">${esc(step.label)}</span>
+                </div>
+            `;
+        }).join('');
+    })();
+
+    // ── Left column: post ──
+    document.getElementById('post-bio').textContent = ITEM.author_bio;
+    document.getElementById('post-date').textContent = ITEM.created_at;
+
+    // Render post body with bold headings
+    (function renderBody() {
+        const body = ITEM.post_content;
+        const el = document.getElementById('post-body');
+        // Headings are lines that end with ':' and start the line
+        const lines = body.split('\n');
+        let html = '';
+        let firstLine = true;
+        lines.forEach((line, i) => {
+            const trimmed = line.trim();
+            if (trimmed === '') {
+                html += '\n';
+                return;
+            }
+            const isHeading = /^[A-Z][A-Za-z &/]+:$|^LLM Knowledge Bases$|^TLDR:/.test(trimmed);
+            const isLeading = firstLine && !isHeading;
+            firstLine = false;
+            if (isHeading) {
+                html += `<div class="kb-heading">${esc(trimmed)}</div>`;
+            } else {
+                html += esc(line) + '\n';
+            }
+        });
+        el.innerHTML = html;
+    })();
+
+    // Engagement metrics
+    const engagement = [
+        { label: 'Views',     value: ITEM.views },
+        { label: 'Likes',     value: ITEM.likes },
+        { label: 'Reposts',   value: ITEM.reposts },
+        { label: 'Bookmarks', value: ITEM.bookmarks },
+        { label: 'Replies',   value: ITEM.replies_count },
+    ];
+    document.getElementById('post-engagement').innerHTML = engagement.map((e) => `
+        <div class="eng-stat">
+            <strong>${esc(e.value)}</strong>
+            <span class="eng-stat-label">${esc(e.label)}</span>
+        </div>
+    `).join('');
+
+    // ── Second Brain notes ──
+    (function renderBrain() {
+        const el = document.getElementById('brain-list');
+        if (!ITEM.brain_notes || ITEM.brain_notes.length === 0) {
+            el.innerHTML = '<div style="color: var(--text-muted); font-size: 13px; padding: 12px;">No related notes found.</div>';
+            return;
+        }
+        el.innerHTML = ITEM.brain_notes.map((note) => `
+            <div class="brain-note">
+                <div class="brain-note-title">
+                    <span>${esc(note.title)}</span>
+                    <span class="brain-note-relevance">rel ${Math.round((note.relevance || 0) * 100)}%</span>
+                </div>
+                <div class="brain-note-source">${esc(note.source)}</div>
+                <div class="brain-note-snippet">${esc(note.snippet)}</div>
+            </div>
+        `).join('');
+    })();
+
+    // ── Composer ──
+    const replyTa = document.getElementById('reply-textarea');
+    const questionTa = document.getElementById('question-textarea');
+    const replyCount = document.getElementById('reply-count');
+    const replyBtn = document.getElementById('reply-x-btn');
+    const regenBtn = document.getElementById('regen-btn');
+    const rejectBtn = document.getElementById('reject-btn');
+    const sendHint = document.getElementById('send-hint');
+
+    let variantIndex = 0;
+
+    function updateReplyUI() {
+        const text = replyTa.value;
+        const len = text.length;
+        replyCount.textContent = len + ' chars';
+        replyCount.classList.toggle('over', len > 280);
+
+        // Build the X intent URL. IMPORTANT: this points at the REAL post ID
+        // so clicking actually opens the native reply composer on x.com.
+        const params = new URLSearchParams({
+            in_reply_to: ITEM.post_id,
+            text: text,
+        });
+        replyBtn.href = 'https://x.com/intent/tweet?' + params.toString();
+    }
+
+    // Initial fill
+    replyTa.value = ITEM.reply_variants[0];
+    questionTa.value = ITEM.question_variant;
+    updateReplyUI();
+
+    replyTa.addEventListener('input', updateReplyUI);
+
+    regenBtn.addEventListener('click', () => {
+        variantIndex = (variantIndex + 1) % ITEM.reply_variants.length;
+        replyTa.value = ITEM.reply_variants[variantIndex];
+        updateReplyUI();
+        regenBtn.classList.remove('spin');
+        void regenBtn.offsetWidth; // reflow to restart animation
+        regenBtn.classList.add('spin');
+    });
+
+    rejectBtn.addEventListener('click', () => {
+        sendHint.innerHTML = 'Rejected. <strong>Nothing was sent</strong> — in the real tool this would mark the item as rejected in the reply queue. Click <a href="#" id="restore-link" style="color: var(--accent-dark); text-decoration: underline;">restore</a> to reset the demo.';
+        sendHint.classList.add('done');
+        replyTa.disabled = true;
+        questionTa.disabled = true;
+        replyBtn.style.pointerEvents = 'none';
+        replyBtn.style.opacity = '0.4';
+        regenBtn.style.opacity = '0.4';
+        regenBtn.style.pointerEvents = 'none';
+        rejectBtn.style.display = 'none';
+
+        document.getElementById('restore-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            replyTa.disabled = false;
+            questionTa.disabled = false;
+            replyBtn.style.pointerEvents = '';
+            replyBtn.style.opacity = '';
+            regenBtn.style.opacity = '';
+            regenBtn.style.pointerEvents = '';
+            rejectBtn.style.display = '';
+            variantIndex = 0;
+            replyTa.value = ITEM.reply_variants[0];
+            questionTa.value = ITEM.question_variant;
+            updateReplyUI();
+            sendHint.classList.remove('done');
+            sendHint.innerHTML = 'Clicking <strong>Reply on X</strong> opens X\'s native reply composer for this real post, pre-filled with the drafted text. Review it there before hitting Reply — nothing is sent from this page.';
+        });
+    });
+
+    // Expand / collapse post body
+    const postBody = document.getElementById('post-body');
+    const expandBtn = document.getElementById('expand-btn');
+    expandBtn.addEventListener('click', () => {
+        const isCollapsed = postBody.classList.contains('collapsed');
+        postBody.classList.toggle('collapsed');
+        expandBtn.textContent = isCollapsed ? 'Show less ↑' : 'Show full post ↓';
+    });
+
+    // When user actually clicks Reply on X, briefly update the hint so they
+    // know it opened in a new tab.
+    replyBtn.addEventListener('click', () => {
+        setTimeout(() => {
+            sendHint.innerHTML = '✓ X composer opened in a new tab. Review the reply there and hit <strong>Reply</strong> to actually post it.';
+            sendHint.classList.add('done');
+        }, 200);
+    });
+})();
+</script>
+</body>
+</html>
