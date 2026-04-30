@@ -7,43 +7,45 @@
 <meta name="description" content="A real post from @karpathy, run through the pipeline. See the LLM reasoning, retrieved Second Brain notes, and the drafted reply — then click Reply on X to open the real composer.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
 <style>
 :root {
-    --bg: #faf8f4;
-    --bg-alt: #f3efe7;
+    --bg: #ffffff;
+    --bg-alt: #fafafa;
     --surface: #ffffff;
-    --surface-2: #fbf9f5;
-    --border: #e8e2d5;
-    --border-strong: #d4ccb8;
-    --text: #1a1814;
-    --text-secondary: #6b6559;
-    --text-muted: #9a9485;
-    --accent: #e8a03c;
-    --accent-dark: #c7861f;
-    --accent-soft: #fbeccb;
-    --green: #3b9e5c;
-    --green-soft: #e1f1e5;
-    --red: #c74444;
-    --red-soft: #f5dede;
-    --blue: #4a9ead;
-    --blue-soft: #e0eef1;
-    --purple: #9868b8;
-    --purple-soft: #efe5f5;
-    --shadow-sm: 0 1px 2px rgba(26, 24, 20, 0.04);
-    --shadow-md: 0 4px 16px rgba(26, 24, 20, 0.06);
-    --shadow-lg: 0 12px 40px rgba(26, 24, 20, 0.10);
+    --surface-2: #fafafa;
+    --border: rgba(0, 0, 0, 0.1);
+    --border-strong: rgba(0, 0, 0, 0.2);
+    --text: #000000;
+    --text-secondary: rgba(0, 0, 0, 0.7);
+    --text-muted: rgba(0, 0, 0, 0.5);
+    /* Kept for compat with inline styles in JS — all monochrome now */
+    --accent: #000;
+    --accent-dark: #000;
+    --accent-soft: rgba(0, 0, 0, 0.05);
+    --green: #000;
+    --green-soft: rgba(0, 0, 0, 0.05);
+    --red: #000;
+    --red-soft: rgba(0, 0, 0, 0.05);
+    --blue: #000;
+    --blue-soft: rgba(0, 0, 0, 0.05);
+    --purple: #000;
+    --purple-soft: rgba(0, 0, 0, 0.05);
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Inter', "PingFang TC", "PingFang SC", "Microsoft JhengHei", sans-serif;
     background: var(--bg);
     color: var(--text);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
-    font-feature-settings: 'ss01', 'cv11';
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
 }
 .wrap {
     max-width: 1180px;
@@ -55,7 +57,7 @@ body {
 .topbar {
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    padding: 14px 0;
+    padding: 18px 0;
 }
 .topbar-inner {
     display: flex;
@@ -67,74 +69,70 @@ body {
 .brand {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-family: 'Fraunces', Georgia, serif;
+    gap: 12px;
     font-weight: 600;
-    font-size: 17px;
+    font-size: 18px;
     letter-spacing: -0.01em;
     color: var(--text);
     text-decoration: none;
 }
 .brand-dot {
-    width: 10px;
-    height: 10px;
-    background: var(--accent);
-    border-radius: 50%;
-    box-shadow: 0 0 0 3px var(--accent-soft);
+    width: 8px;
+    height: 8px;
+    background: #000;
+    border-radius: 0;
 }
 .brand-meta {
-    font-family: 'Inter', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--text-muted);
-    padding-left: 12px;
+    padding-left: 14px;
     margin-left: 4px;
-    border-left: 1px solid var(--border);
-    letter-spacing: 0.02em;
+    border-left: 1px solid var(--border-strong);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 .topbar-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 .chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 8px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--text-secondary);
-    background: var(--bg-alt);
-    border: 1px solid var(--border);
-    padding: 6px 11px;
-    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
+    padding: 5px 11px;
+    border-radius: 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 .chip-live {
-    background: #fff;
-    color: var(--green);
-    border-color: var(--green-soft);
-    font-weight: 600;
+    color: var(--text);
+    border-color: #000;
 }
 .chip-live::before {
     content: '';
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 0 2px var(--green-soft);
+    background: #000;
     animation: livepulse 1.8s ease-in-out infinite;
 }
 @keyframes livepulse {
     0%, 100% { opacity: 1; }
-    50% { opacity: 0.35; }
+    50%      { opacity: 0.3; }
 }
 
-/* ──────── Dashboard strip ──────── */
+/* ──────── Strip ──────── */
 .strip {
     background: var(--bg-alt);
     border-bottom: 1px solid var(--border);
-    padding: 16px 0;
+    padding: 14px 0;
 }
 .strip-inner {
     display: flex;
@@ -144,15 +142,18 @@ body {
     flex-wrap: wrap;
 }
 .strip-title {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--text);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
 }
 .strip-title span {
     color: var(--text-muted);
-    font-weight: 500;
+    font-weight: 400;
     margin-left: 6px;
+    text-transform: none;
+    letter-spacing: 0;
 }
 .strip-note {
     font-size: 13px;
@@ -162,34 +163,94 @@ body {
     gap: 8px;
 }
 .strip-note strong {
-    color: var(--accent-dark);
+    color: var(--text);
     font-weight: 600;
 }
 
-/* ──────── Main review layout ──────── */
+/* ──────── Main ──────── */
 .main {
-    padding: 32px 0 80px;
+    padding: 36px 0 80px;
 }
 .review {
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 20px;
 }
 .panel-stack {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
 }
-/* Reply composer spans full width */
 .composer-panel { grid-column: 1 / -1; }
 
-/* ──────── Left column: the real post ──────── */
+/* ──────── Pipeline trace (top of page) ──────── */
+.pipeline-trace {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0;
+    margin-bottom: 36px;
+    position: relative;
+}
+.trace-step {
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-right: none;
+    padding: 16px 16px 18px;
+    position: relative;
+    background: var(--surface);
+    min-height: 96px;
+}
+.trace-step:last-child { border-right: 1px solid rgba(0, 0, 0, 0.2); }
+.trace-step.current {
+    border-color: #000;
+    background: rgba(0, 0, 0, 0.025);
+}
+.trace-step.current + .trace-step { border-left-color: #000; }
+.trace-step + .trace-step::before {
+    content: '→';
+    position: absolute;
+    left: -8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #fff;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #000;
+    z-index: 1;
+}
+.trace-num {
+    font-size: 10px;
+    color: rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.08em;
+    font-weight: 500;
+}
+.trace-step.current .trace-num { color: var(--text); }
+.trace-label {
+    display: block;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.005em;
+    margin-top: 6px;
+}
+.trace-sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+}
+.trace-step.current .trace-sub { color: var(--text-secondary); }
+
+/* ──────── Post card (left) ──────── */
 .post-card {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 0;
     padding: 28px 30px;
-    box-shadow: var(--shadow-md);
     max-width: 680px;
 }
 .post-head {
@@ -197,19 +258,22 @@ body {
     align-items: center;
     gap: 14px;
     margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
 }
 .post-avatar {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #c9b79a, #6b6559);
+    background: #000;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: 700;
-    font-size: 16px;
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
 }
 .post-author {
@@ -220,21 +284,22 @@ body {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-weight: 700;
+    font-weight: 600;
     font-size: 16px;
     line-height: 1.2;
+    color: var(--text);
 }
 .post-name svg {
     width: 16px;
     height: 16px;
-    color: #1d9bf0;
+    color: var(--text);
     flex-shrink: 0;
 }
 .post-handle {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-muted);
     line-height: 1.3;
-    margin-top: 2px;
+    margin-top: 3px;
 }
 .post-handle a {
     color: inherit;
@@ -242,8 +307,8 @@ body {
 }
 .post-handle a:hover { color: var(--text-secondary); }
 .x-logo {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     color: var(--text);
     flex-shrink: 0;
 }
@@ -252,16 +317,17 @@ body {
     font-size: 13px;
     color: var(--text-secondary);
     margin-bottom: 18px;
-    padding: 10px 14px;
+    padding: 12px 14px;
     background: var(--surface-2);
     border-left: 2px solid var(--border-strong);
-    border-radius: 4px 8px 8px 4px;
-    line-height: 1.5;
+    border-radius: 0;
+    font-style: italic;
+    line-height: 1.55;
 }
 
 .post-body {
-    font-size: 15.5px;
-    line-height: 1.62;
+    font-size: 15px;
+    line-height: 1.65;
     color: var(--text);
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -282,25 +348,28 @@ body {
     pointer-events: none;
 }
 .post-body .kb-heading {
-    font-family: 'Fraunces', serif;
     font-weight: 600;
-    font-size: 17px;
-    margin-top: 2px;
+    font-size: 15px;
+    margin-top: 4px;
     margin-bottom: 4px;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.005em;
 }
 .expand-btn {
     display: block;
     width: 100%;
-    padding: 10px 0;
+    padding: 12px 0;
     border: none;
+    border-top: 1px solid var(--border);
     background: transparent;
     font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--accent-dark);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
     cursor: pointer;
     text-align: center;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 16px;
     transition: color 0.15s;
 }
 .expand-btn:hover { color: var(--text); }
@@ -309,185 +378,113 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
-    margin: 18px 0 14px;
-    padding: 14px 0 0;
-    border-top: 1px solid var(--border);
+    margin: 14px 0 14px;
+    letter-spacing: 0.02em;
 }
-.post-meta .dot { opacity: 0.5; }
 
 .post-engagement {
     display: flex;
-    gap: 24px;
-    padding-top: 14px;
+    gap: 28px;
+    padding-top: 18px;
     border-top: 1px solid var(--border);
     flex-wrap: wrap;
 }
 .eng-stat {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 .eng-stat strong {
-    font-family: 'Fraunces', serif;
     font-weight: 600;
     font-size: 18px;
     color: var(--text);
     letter-spacing: -0.01em;
 }
 .eng-stat-label {
-    font-size: 11px;
+    font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.1em;
     color: var(--text-muted);
     font-weight: 500;
+    margin-top: 2px;
 }
 
-/* ──────── Right column: pipeline output ──────── */
-/* panel-stack layout is defined above with sticky positioning */
-
+/* ──────── Panel ──────── */
 .panel {
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 22px 24px;
-    box-shadow: var(--shadow-sm);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 0;
+    padding: 24px 24px;
 }
-.panel:hover { box-shadow: var(--shadow-md); }
 
 .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 14px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
     flex-wrap: wrap;
 }
 .panel-label {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    letter-spacing: 0.12em;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 .panel-label .step-num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
+    min-width: 30px;
     height: 22px;
-    background: var(--accent-soft);
-    color: var(--accent-dark);
-    border-radius: 50%;
-    font-family: 'Fraunces', serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
+    padding: 0 8px;
+    background: #000;
+    color: #fff;
+    border-radius: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
 }
 .panel-pill {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 4px 10px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent-dark);
-}
-
-/* LLM decision panel */
-.reasoning {
-    font-size: 14.5px;
-    line-height: 1.62;
-    color: var(--text);
-    padding: 14px 16px;
-    background: var(--surface-2);
-    border-radius: 10px;
-    border-left: 3px solid var(--accent);
-    font-style: italic;
-}
-.confidence-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 14px;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-strong);
     color: var(--text-secondary);
-}
-.confidence-track {
-    flex: 1;
-    height: 6px;
-    background: var(--bg-alt);
-    border-radius: 3px;
-    overflow: hidden;
-    position: relative;
-}
-.confidence-fill {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, var(--accent), var(--accent-dark));
-    border-radius: 3px;
-    transition: width 0.6s ease-out;
-}
-.confidence-value {
-    font-family: 'Fraunces', serif;
-    font-weight: 700;
-    font-size: 15px;
-    color: var(--accent-dark);
-    letter-spacing: -0.01em;
-}
-
-/* Category panel */
-.category-pill {
-    display: inline-flex;
-    align-items: center;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    padding: 6px 14px;
-    border-radius: 999px;
-    background: var(--purple-soft);
-    color: var(--purple);
-}
-.category-note {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-top: 10px;
-    line-height: 1.5;
-}
-
-/* Second Brain panel */
-.brain-heading {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--blue);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
 }
+
+/* ──────── Brain notes ──────── */
 .brain-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    margin-top: 4px;
+    gap: 0;
 }
 .brain-note {
-    background: linear-gradient(to right, var(--blue-soft) 0%, var(--surface-2) 40%);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--blue);
-    border-radius: 4px 12px 12px 4px;
-    padding: 14px 18px;
-    transition: transform 0.15s;
+    background: var(--surface);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 16px 0 18px;
+    transition: background 0.15s;
 }
+.brain-note:first-child { padding-top: 4px; }
+.brain-note:last-child { border-bottom: none; padding-bottom: 0; }
 .brain-note:hover {
-    transform: translateX(2px);
+    background: rgba(0, 0, 0, 0.02);
 }
 .brain-note-title {
     font-weight: 600;
@@ -495,80 +492,81 @@ body {
     color: var(--text);
     margin-bottom: 4px;
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
 }
 .brain-note-relevance {
-    font-family: 'Fraunces', serif;
-    font-size: 12px;
-    color: var(--blue);
-    font-weight: 600;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
     white-space: nowrap;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 .brain-note-source {
-    font-size: 11.5px;
+    font-size: 11px;
     color: var(--text-muted);
     margin-bottom: 8px;
-    font-family: 'Fraunces', serif;
     font-style: italic;
 }
 .brain-note-snippet {
-    font-size: 13.5px;
-    line-height: 1.58;
+    font-size: 13px;
+    line-height: 1.6;
     color: var(--text-secondary);
 }
 
-/* Reply composer */
+/* ──────── Composer ──────── */
 .composer-panel {
-    background: linear-gradient(180deg, var(--accent-soft) 0%, var(--surface) 18%);
-    border: 1px solid var(--border);
-    border-top: 2px solid var(--accent);
-    border-radius: 16px;
-    padding: 22px 24px;
-    box-shadow: var(--shadow-md);
+    background: var(--surface);
+    border: 1px solid #000;
+    border-radius: 0;
+    padding: 24px 24px 26px;
 }
 .composer-label {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
-    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    gap: 12px;
     flex-wrap: wrap;
 }
 .composer-label-text {
     font-size: 11px;
-    font-weight: 700;
-    color: var(--accent-dark);
-    letter-spacing: 0.12em;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 .composer-label-text .step-num {
-    background: var(--accent);
-    color: white;
+    background: #000;
+    color: #fff;
 }
 .regen-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     font-family: inherit;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11px;
+    font-weight: 500;
     color: var(--text-secondary);
     background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 7px 12px;
-    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    padding: 6px 12px;
+    border-radius: 0;
     cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     transition: all 0.15s;
 }
 .regen-btn:hover {
-    color: var(--accent-dark);
-    border-color: var(--accent);
-    background: var(--accent-soft);
+    color: var(--text);
+    border-color: #000;
 }
 .regen-btn.spin svg { animation: spin 0.7s linear; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -576,15 +574,15 @@ body {
 .composer-field {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 0;
     padding: 14px 16px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 .composer-field label {
-    font-size: 10.5px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 500;
     color: var(--text-muted);
-    letter-spacing: 0.1em;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     display: block;
     margin-bottom: 8px;
@@ -595,8 +593,8 @@ body {
     border: none;
     background: transparent;
     font-family: inherit;
-    font-size: 15px;
-    line-height: 1.6;
+    font-size: 14px;
+    line-height: 1.62;
     color: var(--text);
     resize: vertical;
     outline: none;
@@ -605,16 +603,17 @@ body {
 .composer-foot {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 10px;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 .composer-count {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-muted);
     font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
 }
-.composer-count.over { color: var(--red); font-weight: 600; }
+.composer-count.over { color: var(--text); font-weight: 600; }
 
 .send-row {
     display: flex;
@@ -628,31 +627,31 @@ body {
     justify-content: center;
     gap: 8px;
     font-family: inherit;
-    font-size: 14.5px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     padding: 13px 22px;
-    border-radius: 11px;
+    border-radius: 0;
     border: 1px solid transparent;
     cursor: pointer;
     text-decoration: none;
+    letter-spacing: 0.02em;
     transition: all 0.15s;
     white-space: nowrap;
 }
 .btn-primary {
     background: #000;
-    color: white;
+    color: #fff;
     flex: 1;
     min-width: 180px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    border-color: #000;
 }
 .btn-primary:hover {
-    background: #1a1814;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    background: #fff;
+    color: #000;
 }
 .btn-primary svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 .btn-secondary {
     background: var(--surface);
@@ -660,71 +659,24 @@ body {
     border-color: var(--border-strong);
 }
 .btn-secondary:hover {
-    color: var(--red);
-    border-color: var(--red-soft);
-    background: var(--red-soft);
+    color: var(--text);
+    border-color: #000;
+    background: var(--surface);
 }
 
 .send-hint {
-    margin-top: 12px;
-    font-size: 12.5px;
+    margin-top: 14px;
+    font-size: 12px;
     color: var(--text-muted);
-    line-height: 1.55;
+    line-height: 1.6;
     text-align: center;
 }
 .send-hint strong { color: var(--text-secondary); font-weight: 600; }
 
 .send-hint.done {
-    color: var(--green);
+    color: var(--text);
     font-weight: 500;
 }
-
-/* Pipeline trace (tiny row above panels) */
-.pipeline-trace {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    margin-bottom: 20px;
-    padding: 10px 0;
-    overflow-x: auto;
-}
-.trace-step {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-.trace-step + .trace-step::before {
-    content: '→';
-    color: var(--text-muted);
-    margin: 0 10px;
-    font-size: 13px;
-}
-.trace-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    background: var(--green-soft);
-    color: var(--green);
-    border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
-    font-family: 'Fraunces', serif;
-}
-.trace-step.current .trace-icon {
-    background: var(--accent);
-    color: white;
-    box-shadow: 0 0 0 4px var(--accent-soft);
-}
-.trace-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.02em;
-}
-.trace-step.current .trace-label { color: var(--text); }
 
 /* ──────── Footer ──────── */
 .footer {
@@ -735,24 +687,26 @@ body {
 }
 .disclaimer {
     background: var(--surface);
-    border: 1px solid var(--border-strong);
-    border-left: 3px solid var(--accent);
-    border-radius: 12px;
-    padding: 18px 24px;
-    font-size: 14px;
-    line-height: 1.62;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-left: 3px solid #000;
+    border-radius: 0;
+    padding: 18px 22px;
+    font-size: 13px;
+    line-height: 1.65;
     color: var(--text-secondary);
     margin-bottom: 24px;
 }
-.disclaimer strong { color: var(--text); font-weight: 700; }
+.disclaimer strong { color: var(--text); font-weight: 600; }
 .footer-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
     gap: 16px;
-    font-size: 13.5px;
+    font-size: 11px;
     color: var(--text-muted);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 .footer-row a {
     color: var(--text-secondary);
@@ -765,11 +719,17 @@ body {
 /* ──────── Responsive ──────── */
 @media (max-width: 960px) {
     .panel-stack { grid-template-columns: 1fr; }
+    .pipeline-trace {
+        grid-template-columns: repeat(3, 1fr);
+        row-gap: 0;
+    }
+    .trace-step:nth-child(3) { border-right: 1px solid rgba(0, 0, 0, 0.2); }
+    .trace-step:nth-child(n+4) { border-top: none; }
 }
 @media (max-width: 640px) {
     .wrap { padding: 0 16px; }
-    .post-card { padding: 22px 20px; border-radius: 14px; }
-    .panel { padding: 18px 20px; border-radius: 14px; }
+    .post-card { padding: 22px 20px; }
+    .panel { padding: 18px 20px; }
     .composer-panel { padding: 18px 20px; }
     .main { padding: 20px 0 48px; }
     .strip-inner { flex-direction: column; align-items: flex-start; }
@@ -778,6 +738,9 @@ body {
     .eng-stat strong { font-size: 16px; }
     .topbar-actions .chip { display: none; }
     .topbar-actions .chip-live { display: inline-flex; }
+    .pipeline-trace { grid-template-columns: repeat(2, 1fr); }
+    .trace-step { border-right: 1px solid rgba(0, 0, 0, 0.2); }
+    .trace-step:nth-child(2n) { border-left: none; }
 }
 </style>
 </head>
@@ -786,10 +749,10 @@ body {
 <!-- ──────── Top bar ──────── -->
 <header class="topbar">
     <div class="wrap topbar-inner">
-        <a href="#" class="brand">
+        <a href="https://cebillhsu.xyz" class="brand">
             <span class="brand-dot"></span>
             Pickyback
-            <span class="brand-meta">Interactive Demo</span>
+            <span class="brand-meta">Live Demo</span>
         </a>
         <div class="topbar-actions">
             <span class="chip chip-live">Live pipeline trace</span>
@@ -855,9 +818,9 @@ body {
                 <section class="panel">
                     <div class="panel-header">
                         <div class="panel-label">
-                            <span class="step-num">2</span> Second Brain retrieval
+                            <span class="step-num">04</span> Second Brain retrieval
                         </div>
-                        <span class="panel-pill" style="background: var(--blue-soft); color: var(--blue);">3 notes matched</span>
+                        <span class="panel-pill">3 notes matched</span>
                     </div>
                     <div class="brain-list" id="brain-list"></div>
                 </section>
@@ -866,7 +829,7 @@ body {
                 <section class="composer-panel">
                     <div class="composer-label">
                         <div class="composer-label-text">
-                            <span class="step-num">3</span> Drafted reply
+                            <span class="step-num">05</span> Drafted reply
                         </div>
                         <button type="button" class="regen-btn" id="regen-btn">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
@@ -883,14 +846,14 @@ body {
                     </div>
 
                     <div class="composer-field composer-field-q">
-                        <label>Alternative: question framing</label>
+                        <label>Alternative · question framing</label>
                         <textarea id="question-textarea"></textarea>
                     </div>
 
                     <div class="send-row">
                         <a class="btn btn-primary" id="reply-x-btn" href="#" target="_blank" rel="noopener">
                             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                            Reply on X ↗
+                            Reply on X →
                         </a>
                         <button type="button" class="btn btn-secondary" id="reject-btn">Reject</button>
                     </div>
@@ -945,10 +908,12 @@ body {
         const el = document.getElementById('pipeline-trace');
         el.innerHTML = PIPELINE.map((step, i) => {
             const current = step.id === 'review';
+            const num = '/ ' + String(i + 1).padStart(2, '0');
             return `
                 <div class="trace-step ${current ? 'current' : ''}">
-                    <span class="trace-icon">${current ? '•' : '✓'}</span>
+                    <span class="trace-num">${num}</span>
                     <span class="trace-label">${esc(step.label)}</span>
+                    ${step.sublabel ? `<span class="trace-sub">${esc(step.sublabel)}</span>` : ''}
                 </div>
             `;
         }).join('');
@@ -962,7 +927,6 @@ body {
     (function renderBody() {
         const body = ITEM.post_content;
         const el = document.getElementById('post-body');
-        // Headings are lines that end with ':' and start the line
         const lines = body.split('\n');
         let html = '';
         let firstLine = true;
@@ -1010,7 +974,7 @@ body {
             <div class="brain-note">
                 <div class="brain-note-title">
                     <span>${esc(note.title)}</span>
-                    <span class="brain-note-relevance">rel ${Math.round((note.relevance || 0) * 100)}%</span>
+                    <span class="brain-note-relevance">REL ${Math.round((note.relevance || 0) * 100)}%</span>
                 </div>
                 <div class="brain-note-source">${esc(note.source)}</div>
                 <div class="brain-note-snippet">${esc(note.snippet)}</div>
@@ -1035,8 +999,7 @@ body {
         replyCount.textContent = len + ' chars';
         replyCount.classList.toggle('over', len > 280);
 
-        // Build the X intent URL. IMPORTANT: this points at the REAL post ID
-        // so clicking actually opens the native reply composer on x.com.
+        // Build the X intent URL pointing at the REAL post ID.
         const params = new URLSearchParams({
             in_reply_to: ITEM.post_id,
             text: text,
@@ -1056,12 +1019,12 @@ body {
         replyTa.value = ITEM.reply_variants[variantIndex];
         updateReplyUI();
         regenBtn.classList.remove('spin');
-        void regenBtn.offsetWidth; // reflow to restart animation
+        void regenBtn.offsetWidth;
         regenBtn.classList.add('spin');
     });
 
     rejectBtn.addEventListener('click', () => {
-        sendHint.innerHTML = 'Rejected. <strong>Nothing was sent</strong> — in the real tool this would mark the item as rejected in the reply queue. Click <a href="#" id="restore-link" style="color: var(--accent-dark); text-decoration: underline;">restore</a> to reset the demo.';
+        sendHint.innerHTML = 'Rejected. <strong>Nothing was sent</strong> — in the real tool this would mark the item as rejected in the reply queue. Click <a href="#" id="restore-link" style="color: var(--text); text-decoration: underline;">restore</a> to reset the demo.';
         sendHint.classList.add('done');
         replyTa.disabled = true;
         questionTa.disabled = true;
@@ -1098,8 +1061,7 @@ body {
         expandBtn.textContent = isCollapsed ? 'Show less ↑' : 'Show full post ↓';
     });
 
-    // When user actually clicks Reply on X, briefly update the hint so they
-    // know it opened in a new tab.
+    // Hint update on Reply click
     replyBtn.addEventListener('click', () => {
         setTimeout(() => {
             sendHint.innerHTML = '✓ X composer opened in a new tab. Review the reply there and hit <strong>Reply</strong> to actually post it.';
