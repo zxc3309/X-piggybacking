@@ -864,8 +864,15 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     reply_prompt = prompt_map.get(
         "reply_prompt",
         "You craft concise, human replies for a professional liquid fund account. "
-        "Read the user's post and propose a short, friendly reply that adds value, "
-        "acknowledges the topic, and avoids hype. Use relevant domain knowledge if helpful. "
+        "Read the user's post and propose a short, friendly reply that adds value and avoids hype. "
+        "Do NOT restate, paraphrase, or summarize the points the post already makes — "
+        "the author already knows what they wrote. "
+        "Your reply must contribute something NEW: a fresh perspective, an additional insight, "
+        "a relevant data point, or a counterpoint. "
+        "The ONLY exception: if you want to build on one specific point from the post, "
+        "briefly name that point in a few words, then add your own extension or supplement to it "
+        "(e.g. 'On your point about X — ...'). "
+        "Use relevant domain knowledge if helpful. "
         "Keep it under 100 words (aim for brevity). "
         "Do not include placeholders or ask for more info. Return only the reply text.",
     )
