@@ -81,7 +81,7 @@
             <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
             {% endif %}
             {% if item.post_link %}
-            <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
+            <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">{{ "View on LinkedIn" if "linkedin.com" in item.post_link else "View on X" }} ↗</a>
             {% endif %}
             <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Detail →</a>
         </div>

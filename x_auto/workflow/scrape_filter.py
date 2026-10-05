@@ -25,6 +25,8 @@ import requests
 from dotenv import load_dotenv
 
 from x_auto.scrapers.apify_client import fetch_posts
+from x_auto.scrapers.linkedin_client import fetch_linkedin_posts
+from x_auto.scrapers.linkedin_client import normalize_profile_url as normalize_linkedin_url
 from x_auto.scrapers.article_detector import is_article_post, get_article_content_for_post
 from x_auto.sheets.client import GoogleSheetsClient
 
@@ -169,6 +171,44 @@ def get_profile_urls(sheet_client: GoogleSheetsClient, sheet_name: str = "profil
     if len(valid_urls) != len(urls):
         print(f"Filtered out {len(urls) - len(valid_urls)} invalid profile URLs.")
     return valid_urls
+
+
+def get_linkedin_profile_urls(sheet_client: GoogleSheetsClient, sheet_name: str = "profiles") -> List[str]:
+    """
+    Extract LinkedIn profile/company URLs from the `LinkedIn (link)` column of the profiles sheet.
+
+    Returns an empty list when the column is missing or blank, so X-only sheets keep working.
+    """
+    worksheet_name = os.getenv("GOOGLE_WS_PROFILES") or os.getenv("GOOGLE_X_PROFILES_WORKSHEET", sheet_name)
+    try:
+        worksheet = sheet_client.get_sheet(worksheet_name)
+        records = worksheet.get_all_records()
+    except Exception as exc:  # noqa: BLE001
+        print(f"[LinkedIn] Could not read profiles sheet: {exc}")
+        return []
+
+    urls: List[str] = []
+    seen = set()
+    for row in records:
+        raw = ""
+        for key in ("LinkedIn (link)", "LinkedIn(link)", "LinkedIn link", "LinkedIn"):
+            if row.get(key):
+                raw = str(row.get(key))
+                break
+        for part in re.split(r"[\s,|]+", raw):
+            p = part.strip().strip('"').strip("'")
+            if not p or p.lower() in {"n/a", "na"}:
+                continue
+            if p.startswith("linkedin.com/") or p.startswith("www.linkedin.com/"):
+                p = "https://" + p
+            if "linkedin.com/in/" not in p and "linkedin.com/company/" not in p:
+                continue
+            key = normalize_linkedin_url(p)
+            if key in seen:
+                continue
+            seen.add(key)
+            urls.append(p.split("?")[0])
+    return urls
 
 
 def is_recent_post(post: Dict[str, Any], days: int = 30) -> bool:
@@ -960,6 +1000,28 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
         if author_handle:
             posts_by_handle.setdefault(author_handle, []).append(post)
 
+    # LinkedIn profiles from the same sheet go through the same per-profile loop,
+    # keyed by profile URL instead of an X handle.
+    if os.getenv("LINKEDIN_ENABLED", "true").lower() == "true":
+        linkedin_urls = get_linkedin_profile_urls(sheet_client)
+        if linkedin_urls:
+            linkedin_max_posts = int(os.getenv("LINKEDIN_MAX_POSTS", str(post_limit)) or post_limit)
+            print(f"\n[LinkedIn] Fetching posts for {len(linkedin_urls)} profiles (max {linkedin_max_posts} each)...")
+            try:
+                linkedin_posts = fetch_linkedin_posts(
+                    linkedin_urls, max_posts=linkedin_max_posts, lookback_days=lookback_days
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"[LinkedIn] Fetch failed, continuing with X only: {exc}")
+                linkedin_posts = []
+            print(f"[LinkedIn] Fetched {len(linkedin_posts)} posts")
+            for li_url in linkedin_urls:
+                key = normalize_linkedin_url(li_url)
+                handles.append(key)
+                url_to_handle[key] = li_url
+            for post in linkedin_posts:
+                posts_by_handle.setdefault(post.get("_target_url", ""), []).append(post)
+
     # Process each profile's posts
     # Note: Apify API date filters may not work as expected, so we filter again here
     for idx, handle in enumerate(handles, start=1):
@@ -1241,6 +1303,9 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                 text = (post.get("text") or post.get("postText") or "").strip()
                 author = post.get("author", {}).get("userName", "")
                 post_id = item.get("post_id", "")
+                if post.get("platform") == "linkedin":
+                    # No X post id: keeps the dashboard from offering an X reply intent.
+                    post_id = ""
                 post_link = post.get("postUrl") or post.get("url") or ""
                 if not post_link and post_id:
                     if author:

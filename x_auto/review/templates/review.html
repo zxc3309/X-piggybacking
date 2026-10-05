@@ -40,7 +40,7 @@
                         {% endif %}
                     </span>
                     {% if item.post_link %}
-                    <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">View on X ↗</a>
+                    <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">{{ "View on LinkedIn" if "linkedin.com" in item.post_link else "View on X" }} ↗</a>
                     {% endif %}
                 </div>
                 <div class="post-content" data-raw="{{ item.post_content | e }}">{{ item.post_content }}</div>

@@ -6,6 +6,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 
 - **Profile monitoring** - Track X handles from Google Sheets
 - **Apify scraping** - Fetch recent posts via `scraper_one/x-profile-posts-scraper`
+- **LinkedIn posts** - Profiles with a `LinkedIn (link)` value in the profiles sheet are fetched via `harvestapi/linkedin-profile-posts` (no cookies, ~$0.002/post, plain reposts excluded) and go through the same filter; LinkedIn items never get an X reply intent in the dashboard. Disable with `LINKEDIN_ENABLED=false`; cap per profile with `LINKEDIN_MAX_POSTS` (defaults to `POST_RESULTS_LIMIT`)
 - **Multi-AI provider support** - Switch between OpenAI, Anthropic Claude, Google Gemini via Google Sheet or env var
 - **AI-powered filtering** - LLM evaluates each post for relevance (decision recorded as 0/1)
 - **Post categorization** - Auto-categorize posts (token_analysis, industry_analysis, market_comment, etc.)
