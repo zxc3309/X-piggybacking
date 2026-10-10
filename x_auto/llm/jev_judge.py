@@ -1,7 +1,8 @@
 """Batch keep/discard screening of posts with Jev (TypeSafe Noul questions).
 
-One Noul question per post, packed into as few requests as the API limits allow,
-instead of one LLM call per post. Shares the machine's TypeSafe key and budget
+One Noul question per post, at most POSTS_PER_REQUEST posts per request
+(default 1: larger batches mis-attributed scores between posts). Shares the
+machine's TypeSafe key and budget
 ledger with the other Jev callers (ai-employee ballmer-ai-briefing / jev-router):
 
 - the ledger lock is held for the whole paid attempt;
@@ -30,6 +31,11 @@ REQUEST_BYTES = 60_000
 STATE_QUESTION_BYTES = 28_000
 RESERVE_PER_REQUEST = 64_000 * PRICE
 POST_CHARS = 1_500
+# Posts per request. 2026-10-10 first run: one 50-post request drifted scores onto
+# neighbouring posts (an off-topic post got 0.95, the on-topic one after it 0.09),
+# while 4-post tests were right. One post per request removes the indexing; it
+# costs ~50 small requests a day (~US$0.003).
+POSTS_PER_REQUEST = int(os.getenv("JEV_POSTS_PER_REQUEST", "1"))
 LEDGER_NAME = "X_piggybacking Jev judge"
 UNKNOWN_STATUS = "xpiggy_unknown_outcome"
 
@@ -90,7 +96,7 @@ def make_plan(posts: List[Dict[str, str]], policy: str, as_of: str) -> List[dict
     _require(len({c["id"] for c in cards}) == len(cards), "duplicate post IDs")
     requests_, pending = [], []
     for card in cards:
-        if not _fits(_make_request(policy, as_of, pending + [card])):
+        if len(pending) >= POSTS_PER_REQUEST or not _fits(_make_request(policy, as_of, pending + [card])):
             _require(bool(pending), "single post exceeds packing limit")
             requests_.append(_make_request(policy, as_of, pending))
             pending = []
