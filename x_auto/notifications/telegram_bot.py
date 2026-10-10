@@ -32,11 +32,13 @@ CATEGORY_EMOJIS = {
     "others": "🔍"
 }
 
+# Keys are fixed (category_prompt output, sheet history). Since category_prompt v2.0
+# (2026-10-10, AI compute financing) the keys carry the meanings shown here.
 CATEGORY_DISPLAY_NAMES = {
-    "token_analysis": "Token Analysis",
-    "industry_analysis": "Industry Analysis",
-    "market_comment": "General Market Comment",
-    "tokenomic_comment": "Tokenomic Comment",
+    "token_analysis": "Company & Deal Analysis",
+    "industry_analysis": "Industry, Power & Buildout",
+    "market_comment": "GPU Economics & Compute Market",
+    "tokenomic_comment": "Financing Structure",
     "others": "Others"
 }
 
@@ -142,14 +144,14 @@ def format_posts_by_category(posts: List[Dict[str, Any]], llm_info: dict = None)
     total_count = len(posts)
 
     message_parts = [
-        "🚨 <b>Daily Crypto Intelligence Summary</b>",
+        "🚨 <b>Daily AI Compute Financing Summary</b>",
         f"📅 {today} - {total_count} posts",
         ""
     ]
 
     # Sort categories to ensure consistent order
-    category_order = ["token_analysis", "industry_analysis", "market_comment",
-                     "tokenomic_comment", "others"]
+    category_order = ["tokenomic_comment", "token_analysis", "market_comment",
+                     "industry_analysis", "others"]
 
     # Add each category section
     for category in category_order:

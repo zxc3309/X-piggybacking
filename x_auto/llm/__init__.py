@@ -5,6 +5,7 @@ Switch providers by setting the ``LLM_PROVIDER`` environment variable:
     LLM_PROVIDER=openai       # default
     LLM_PROVIDER=anthropic
     LLM_PROVIDER=google
+    LLM_PROVIDER=claude_cli   # local `claude -p`, subscription billing (Mac mini runner)
 
 Optionally override the default model with ``LLM_MODEL``.
 """
@@ -19,6 +20,7 @@ _PROVIDERS: dict[str, tuple[str, str]] = {
     "openai": ("x_auto.llm.openai", "OpenAIProvider"),
     "anthropic": ("x_auto.llm.anthropic", "AnthropicProvider"),
     "google": ("x_auto.llm.google", "GoogleProvider"),
+    "claude_cli": ("x_auto.llm.claude_cli", "ClaudeCLIProvider"),
 }
 
 _instance: LLMProvider | None = None

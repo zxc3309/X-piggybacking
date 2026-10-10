@@ -48,8 +48,13 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 80)
 
     scheduler = XScraperScheduler(background_mode=True)
-    scheduler.add_daily_scrape_job()
-    scheduler.start()
+    # SCHEDULER_ENABLED=false: keep the dashboard but let another runner own the
+    # daily scrape (since 2026-10-10 the Mac mini LaunchAgent, using claude -p).
+    if os.getenv("SCHEDULER_ENABLED", "true").lower() == "true":
+        scheduler.add_daily_scrape_job()
+        scheduler.start()
+    else:
+        logger.info("SCHEDULER_ENABLED=false: daily scrape job not scheduled on this instance")
 
     status = scheduler.get_status()
     logger.info(f"Scheduler status: {status}")
