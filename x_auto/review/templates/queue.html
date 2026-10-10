@@ -25,7 +25,11 @@
             <div class="card-meta">
                 <span class="card-author">
                     {% if item.author %}
+                        {% if "linkedin.com" in (item.post_link or "") %}
+                        <a href="https://www.linkedin.com/in/{{ item.author }}/" target="_blank" rel="noopener">{{ item.author }} (LinkedIn)</a>
+                        {% else %}
                         <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                        {% endif %}
                     {% else %}
                         Unknown author
                     {% endif %}
@@ -75,7 +79,11 @@
             {% if item.status == 'pending' %}
             {% set reply_text = item.edited_reply or item.original_reply or "" %}
             {% set post_id = item.post_id or "" %}
-            {% if post_id and reply_text %}
+            {% if "linkedin.com" in (item.post_link or "") %}
+            {% if reply_text %}
+            <button type="button" class="btn btn-approve btn-sm" data-queue-id="{{ item.queue_id }}" data-reply="{{ reply_text | e }}" data-link="{{ item.post_link | e }}" onclick="replyOnLinkedIn(this)">Copy &amp; reply on LinkedIn ↗</button>
+            {% endif %}
+            {% elif post_id and reply_text %}
             <a class="btn btn-approve btn-sm" href="https://x.com/intent/tweet?in_reply_to={{ post_id }}&text={{ reply_text | urlencode }}" target="_blank" rel="noopener" onclick="approveItem('{{ item.queue_id }}', '{{ reply_text | e }}', null)">Reply on X ↗</a>
             {% endif %}
             <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>

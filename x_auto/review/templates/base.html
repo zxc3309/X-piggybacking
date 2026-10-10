@@ -891,6 +891,26 @@
             return response;
         }
 
+        // LinkedIn has no "compose a reply" URL like X's intent link: copy the reply,
+        // open the post so it can be pasted as a comment, then mark the item approved.
+        async function replyOnLinkedIn(btn) {
+            const text = btn.dataset.reply || '';
+            const link = btn.dataset.link || '';
+            let copied = true;
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (err) {
+                copied = false;
+            }
+            if (link) window.open(link, '_blank', 'noopener');
+            const result = await approveItem(btn.dataset.queueId, text, btn);
+            if (result && result.success) {
+                btn.textContent = copied ? 'Copied: paste as a comment on LinkedIn' : 'Opened: copy the reply manually';
+            }
+            if (!copied) alert('Could not copy automatically. Copy the reply text from this card.');
+            return result;
+        }
+
         async function approveItem(queueId, editedReply = '', btn = null) {
             if (btn) {
                 btn.disabled = true;

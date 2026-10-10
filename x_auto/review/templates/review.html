@@ -34,7 +34,11 @@
                 <div class="card-header">
                     <span class="card-author">
                         {% if item.author %}
+                            {% if "linkedin.com" in (item.post_link or "") %}
+                            <a href="https://www.linkedin.com/in/{{ item.author }}/" target="_blank" rel="noopener">{{ item.author }} (LinkedIn)</a>
+                            {% else %}
                             <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
+                            {% endif %}
                         {% else %}
                             Unknown author
                         {% endif %}
@@ -164,7 +168,7 @@
             <div style="display: flex; gap: 8px;">
                 <button type="button" id="copy-btn" class="btn btn-copy">Copy</button>
                 <button type="button" id="save-btn" class="btn btn-save">Save Draft</button>
-                <button type="button" id="reply-on-x-btn" class="btn btn-approve">Reply on X ↗</button>
+                <button type="button" id="reply-on-x-btn" class="btn btn-approve">{{ "Copy & reply on LinkedIn ↗" if "linkedin.com" in (item.post_link or "") else "Reply on X ↗" }}</button>
             </div>
         </div>
     </div>
@@ -186,6 +190,8 @@
     const counter = document.getElementById('char-count');
     const QUEUE_ID = '{{ item.queue_id }}';
     const POST_ID = '{{ item.post_id or "" }}';
+    const POST_LINK = {{ (item.post_link or "") | tojson }};
+    const IS_LINKEDIN = POST_LINK.includes('linkedin.com');
     const composerEl = document.getElementById('reply-composer');
     const fabEl = document.getElementById('composer-fab');
 
@@ -249,6 +255,20 @@
 
         if (!text) {
             alert('Please enter or select a reply first.');
+            return;
+        }
+
+        if (IS_LINKEDIN) {
+            // No reply-intent URL on LinkedIn: copy, open the post, approve.
+            btn.dataset.queueId = QUEUE_ID;
+            btn.dataset.reply = text;
+            btn.dataset.link = POST_LINK;
+            const result = await replyOnLinkedIn(btn);
+            if (result && result.success) {
+                setTimeout(() => {
+                    window.location.href = `${API_PREFIX}/review?status=pending`;
+                }, 1500);
+            }
             return;
         }
 

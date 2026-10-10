@@ -1278,6 +1278,9 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
                         "question_reco": question_reco,
                         "summary": summary,
                         "category": category,
+                        # Real URL for the Telegram summary; without it the summary builds an
+                        # x.com link, which is wrong for LinkedIn posts.
+                        "post_link": post.get("postUrl") or post.get("url") or "",
                         "post_id": post.get("id") or post.get("postId") or "",
                         "timestamp": post.get("timestamp"),
                         "brain_context": brain_context,
