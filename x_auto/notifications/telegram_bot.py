@@ -25,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 # Category emoji and display name mappings
 CATEGORY_EMOJIS = {
+    "deal_flow": "🤝",
+    "financing_credit": "💰",
+    "compute_pricing": "📈",
+    "token_market": "🔤",
+    "supply_policy": "🏭",
+    # Pre-v3 keys, still on older sheet rows
     "token_analysis": "📊",
     "industry_analysis": "🏭",
     "market_comment": "💬",
@@ -32,9 +38,14 @@ CATEGORY_EMOJIS = {
     "others": "🔍"
 }
 
-# Keys are fixed (category_prompt output, sheet history). Since category_prompt v2.0
-# (2026-10-10, AI compute financing) the keys carry the meanings shown here.
+# Keys come from category_prompt v3.0 (2026-10-24, compute-desk use). The four pre-v3 keys
+# keep their v2.0 (2026-10-10) meanings for rows written before then.
 CATEGORY_DISPLAY_NAMES = {
+    "deal_flow": "Deal Flow & Demand",
+    "financing_credit": "Financing & Credit",
+    "compute_pricing": "GPU-hour Pricing & Hedging",
+    "token_market": "Token & Inference Market",
+    "supply_policy": "Supply, Buildout & Policy",
     "token_analysis": "Company & Deal Analysis",
     "industry_analysis": "Industry, Power & Buildout",
     "market_comment": "GPU Economics & Compute Market",
@@ -149,9 +160,11 @@ def format_posts_by_category(posts: List[Dict[str, Any]], llm_info: dict = None)
         ""
     ]
 
-    # Sort categories to ensure consistent order
-    category_order = ["tokenomic_comment", "token_analysis", "market_comment",
-                     "industry_analysis", "others"]
+    # Sort categories to ensure consistent order; a category missing here is not shown,
+    # so the pre-v3 keys stay listed for unsent older rows.
+    category_order = ["deal_flow", "financing_credit", "compute_pricing", "token_market",
+                      "supply_policy", "tokenomic_comment", "token_analysis", "market_comment",
+                      "industry_analysis", "others"]
 
     # Add each category section
     for category in category_order:

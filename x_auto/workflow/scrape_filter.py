@@ -494,13 +494,11 @@ def categorize_post(post_text: str, prompt: str) -> str:
         prompt: Classification prompt from prompt_inuse worksheet
 
     Returns:
-        Category name: "token_analysis" | "industry_analysis" |
-                       "market_comment" | "tokenomic_comment" | "others"
+        One of VALID_CATEGORIES ("others" when the reply is not a valid key)
     """
     enhanced_prompt = (
         f"{prompt}\n\n"
-        "Respond with ONLY ONE of these exact category names: "
-        "token_analysis, industry_analysis, market_comment, tokenomic_comment, others"
+        f"Respond with ONLY ONE of these exact category names: {', '.join(VALID_CATEGORIES)}"
     )
 
     try:
@@ -508,9 +506,7 @@ def categorize_post(post_text: str, prompt: str) -> str:
         category = reply.strip().lower().replace(" ", "_")
 
         # Validation with fallback
-        valid_categories = ["token_analysis", "industry_analysis", "market_comment",
-                          "tokenomic_comment", "others"]
-        return category if category in valid_categories else "others"
+        return category if category in VALID_CATEGORIES else "others"
     except Exception as e:
         import logging
         logging.warning(f"Categorization failed: {e}")
@@ -559,7 +555,9 @@ def decide_posts(candidates: List[Dict[str, Any]], prompt: str) -> List[Dict[str
     return [get_llm_decision_with_reason(prompt, c["text"]) for c in candidates]
 
 
-VALID_CATEGORIES = ["token_analysis", "industry_analysis", "market_comment", "tokenomic_comment", "others"]
+# Keys since category_prompt v3.0 (2026-10-24, compute-desk use). Telegram also renders
+# the four pre-v3 keys for rows written before then.
+VALID_CATEGORIES = ["deal_flow", "financing_credit", "compute_pricing", "token_market", "supply_policy", "others"]
 
 
 def generate_combined(
@@ -1017,12 +1015,14 @@ def run_scrape_and_filter() -> List[Dict[str, Any]]:
     )
     category_prompt = prompt_map.get(
         "category_prompt",
-        'Classify this crypto/blockchain post into ONE category based on PRIMARY focus: '
-        '1) "token_analysis" - specific token price analysis, charts, technical indicators, price predictions, support/resistance levels '
-        '2) "industry_analysis" - broader blockchain industry trends, regulations, institutional adoption, protocol developments, sector-wide movements '
-        '3) "market_comment" - general market sentiment, macro trends, market psychology, fear/greed indicators, overall market conditions '
-        '4) "tokenomic_comment" - tokenomics analysis, token utility, emission schedules, staking mechanisms, token supply dynamics '
-        '5) "others" - news announcements, educational content, or posts that don\'t fit above categories. '
+        "Classify this post for a GPU compute provider's capital strategy and compute-markets desk "
+        "into ONE category, by its PRIMARY use to the desk: "
+        '1) "deal_flow" - offers or requests for capacity, tokens, financing or insurance; offtaker news that changes who can pay '
+        '2) "financing_credit" - GPU and data-center loans, lenders and terms, guarantees, residual value cover, spreads, ratings '
+        '3) "compute_pricing" - GPU-hour prices by tenor, contract terms, indices, forwards and futures, used-GPU values '
+        '4) "token_market" - token prices, routers, inference revenue or throughput per GPU-hour, open-weight model launches '
+        '5) "supply_policy" - chip allocation, generation transitions, data-center build cost and power, export controls and rules '
+        '6) "others" - anything else. '
         "Respond with ONLY the category name exactly as shown in quotes.",
     )
     question_prompt = prompt_map.get(

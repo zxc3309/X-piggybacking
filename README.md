@@ -9,7 +9,7 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 - **LinkedIn posts** - Profiles with a `LinkedIn (link)` value in the profiles sheet are fetched via `harvestapi/linkedin-profile-posts` (no cookies, ~$0.002/post, plain reposts excluded) and go through the same filter; LinkedIn items never get an X reply intent in the dashboard. Disable with `LINKEDIN_ENABLED=false`; cap per profile with `LINKEDIN_MAX_POSTS` (defaults to `POST_RESULTS_LIMIT`)
 - **Multi-AI provider support** - Switch between OpenAI, Anthropic Claude, Google Gemini, or the local `claude -p` CLI (`claude_cli`) via Google Sheet or env var
 - **AI-powered filtering** - LLM evaluates each post for relevance (decision recorded as 0/1)
-- **Post categorization** - Auto-categorize posts (token_analysis, industry_analysis, market_comment, etc.)
+- **Post categorization** - Auto-categorize posts (deal_flow, financing_credit, compute_pricing, token_market, supply_policy, others)
 - **Smart summaries** - Generate concise headlines for quick review
 - **Reply generation** - AI-powered reply recommendations
 - **Question recommendations** - Suggested follow-up questions for engagement
@@ -255,7 +255,7 @@ SCHEDULER_ENABLED=true          # false = web/dashboard only; another runner own
 
 The daily scrape runs on the Mac mini instead of Railway (Railway has `SCHEDULER_ENABLED=false` and keeps the dashboard / auto-sender). It needs no Anthropic API credit:
 
-- **Judge**: `X_JUDGE=jev` screens every post in one batched Jev (TypeSafe Noul) request, with the active `match_prompt` as the screening policy (`x_auto/llm/jev_judge.py`). It shares the machine's TypeSafe key and budget ledger (`~/.config/typesafe/`). If the Jev attempt fails, it falls back to per-post LLM calls; the run dir under `~/.local/state/x-piggybacking/jev-runs/` keeps plan/responses/attempt and is never retried.
+- **Judge**: `X_JUDGE=jev` screens each post with its own Jev (TypeSafe Noul) request (`JEV_POSTS_PER_REQUEST`, default 1), with the active `match_prompt` as the only screening policy; the criteria in code are topic-free, and post text is cut at 4,000 characters (`x_auto/llm/jev_judge.py`). It shares the machine's TypeSafe key and budget ledger (`~/.config/typesafe/`). If the Jev attempt fails, it falls back to per-post LLM calls; the run dir under `~/.local/state/x-piggybacking/jev-runs/` keeps plan/responses/attempt and is never retried.
 - **Drafts**: `LLM_PROVIDER=claude_cli` calls `claude -p` (subscription, no tools/MCP/settings), and `X_GENERATION=combined` asks for reply, question, summary and category as one JSON object per kept post (falls back to the four separate calls).
 - `LLM_CONFIG_SOURCE=env` ignores the sheet's `llm_config` tab (Railway-era provider setting).
 - If every post judgment fails, a Telegram alert is sent instead of a silent empty day.
@@ -337,7 +337,7 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 
 ## Telegram Notifications
 
-Posts grouped by category (Token Analysis, Industry Analysis, Market Comment, etc.) with direct links to X posts. Each message part includes a link to the review dashboard.
+Posts grouped by category (Deal Flow & Demand, Financing & Credit, GPU-hour Pricing & Hedging, Token & Inference Market, Supply, Buildout & Policy) with direct links to X posts. Each message part includes a link to the review dashboard.
 
 **Enable:** Set `ENABLE_TELEGRAM_NOTIFICATIONS=true` in `.env`
 
