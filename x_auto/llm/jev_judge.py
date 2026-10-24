@@ -24,9 +24,10 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List
 
-MODEL = "jev-1.13.0"
+MODEL = "jev-1.14.0"
 PRICE = 0.042 / 1_000_000
 # API limits: 64k total tokens; 32k state + longest question (2026-09-20, same packing as Ballmer).
+# jev-1.14.0 keeps the same price and limits as 1.13.0 (docs.typesafe.ai/models, checked 2026-10-24).
 REQUEST_BYTES = 60_000
 STATE_QUESTION_BYTES = 28_000
 RESERVE_PER_REQUEST = 64_000 * PRICE
