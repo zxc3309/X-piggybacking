@@ -28,6 +28,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from x_auto.review import queue_manager
 from x_auto.review import researcher_manager
+from x_auto.review.brain_digest import digest
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,13 @@ async def index(request: Request):
 
 
 @app.get("/review", response_class=HTMLResponse)
-async def review_queue(request: Request, status: Optional[str] = None, page: int = 1):
-    """Show the review queue list, optionally filtered by status."""
+async def review_queue(request: Request, status: Optional[str] = None, page: int = 1, linked: int = 0):
+    """Show the review queue list, optionally filtered by status.
+
+    Each card carries a digest of its brain_context (what the post says + high-relevance notes)
+    and an inline reply box, so a post can be read and answered without opening the detail page.
+    linked=1 keeps only posts with at least one high-relevance note.
+    """
     per_page = 20
     try:
         if status and status in queue_manager.VALID_STATUSES:
@@ -86,7 +92,11 @@ async def review_queue(request: Request, status: Optional[str] = None, page: int
         stats = {"pending": 0, "approved": 0, "rejected": 0, "total": 0}
 
     # Reverse once server-side (newest first) and paginate
-    items = list(reversed(items))
+    # Copies, so the digest never lands in queue_manager's shared cache
+    items = [{**it, "digest": digest(it.get("brain_context") or "")} for it in reversed(items)]
+    linked_count = sum(1 for it in items if it["digest"]["links"])
+    if linked:
+        items = [it for it in items if it["digest"]["links"]]
     total_items = len(items)
     total_pages = max(1, (total_items + per_page - 1) // per_page)
     page = max(1, min(page, total_pages))
@@ -103,6 +113,8 @@ async def review_queue(request: Request, status: Optional[str] = None, page: int
             "page": page,
             "total_pages": total_pages,
             "total_items": total_items,
+            "linked": bool(linked),
+            "linked_count": linked_count,
         },
     )
 

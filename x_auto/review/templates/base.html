@@ -863,6 +863,44 @@
             background: var(--surface-2);
             border-color: var(--accent);
         }
+
+        /* ── Queue list: gist, note echoes, inline reply (2026-11-01) ── */
+        .gist { margin: 10px 0 4px; padding-left: 18px; font-size: 14px; line-height: 1.6; color: var(--text); }
+        .gist li { margin: 2px 0; }
+        .post-content.truncated, .post-content.expanded { cursor: pointer; }
+        .post-content.post-secondary { font-size: 12px; color: var(--text-secondary); -webkit-line-clamp: 2; }
+        .post-content.post-secondary.expanded { font-size: 13px; color: var(--text); }
+        .echo { margin: 10px 0; padding: 10px 12px; background: var(--brain-surface); border-left: 3px solid var(--brain); border-radius: 0 2px 2px 0; }
+        .echo-label { font-size: 11px; font-weight: 600; color: var(--brain); letter-spacing: 1px; margin-bottom: 6px; }
+        .echo-item { font-size: 13px; line-height: 1.6; margin: 6px 0; }
+        .echo-why { color: var(--text); margin-left: 4px; }
+        .echo-more summary { cursor: pointer; font-size: 12px; color: var(--brain); margin-top: 2px; }
+        .echo-more p, .echo-more ul { font-size: 12px; color: var(--text-secondary); margin: 4px 0; padding-left: 16px; }
+        .echo-extra { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+        .echo-none { font-size: 12px; color: var(--text-secondary); margin: 8px 0; }
+        .inline-reply { margin-top: 10px; }
+        .inline-edit { min-height: 72px; font-size: 13px; }
+        .inline-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .inline-count { font-size: 11px; color: var(--text-secondary); }
+        .inline-actions { margin-top: 6px; }
+        .card-done { opacity: 0.45; }
+        .card-done .gist, .card-done .echo, .card-done .post-content, .card-done .echo-none { display: none; }
+        .done-note { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+        .tab-toggle { margin-left: auto; color: var(--brain); }
+        .card-views { font-size: 11px; color: var(--text-secondary); }
+        @media (max-width: 768px) {
+            .gist { font-size: 15px; }
+            .echo-item { font-size: 14px; }
+            .inline-edit { font-size: 15px; }
+            .tabs { flex-wrap: wrap; }
+            .tab-toggle { margin-left: 0; width: 100%; border-top: 1px solid var(--border); }
+        }
+        @media (max-width: 480px) {
+            /* two buttons per row instead of one, so a card stays about one screen tall */
+            .card-actions.inline-actions { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+            .card-actions.inline-actions .js-reply { grid-column: 1 / -1; }
+            .inline-bar { flex-direction: column-reverse; align-items: stretch; }
+        }
     </style>
 </head>
 <body>

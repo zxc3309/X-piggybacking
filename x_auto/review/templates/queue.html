@@ -2,30 +2,40 @@
 {% block title %}Review Queue — Reply Review{% endblock %}
 
 {% block content %}
+{% set lq = "&linked=1" if linked else "" %}
 <!-- Filter tabs -->
 <nav class="tabs">
-    <a class="tab {% if not current_filter %}active{% endif %}" href="{{ prefix }}/review">
+    <a class="tab {% if not current_filter %}active{% endif %}" href="{{ prefix }}/review{% if linked %}?linked=1{% endif %}">
         All<span class="tab-count">{{ stats.total }}</span>
     </a>
-    <a class="tab {% if current_filter == 'pending' %}active{% endif %}" href="{{ prefix }}/review?status=pending">
+    <a class="tab {% if current_filter == 'pending' %}active{% endif %}" href="{{ prefix }}/review?status=pending{{ lq }}">
         Pending<span class="tab-count">{{ stats.pending }}</span>
     </a>
-    <a class="tab {% if current_filter == 'approved' %}active{% endif %}" href="{{ prefix }}/review?status=approved">
+    <a class="tab {% if current_filter == 'approved' %}active{% endif %}" href="{{ prefix }}/review?status=approved{{ lq }}">
         Approved<span class="tab-count">{{ stats.approved }}</span>
     </a>
-    <a class="tab {% if current_filter == 'rejected' %}active{% endif %}" href="{{ prefix }}/review?status=rejected">
+    <a class="tab {% if current_filter == 'rejected' %}active{% endif %}" href="{{ prefix }}/review?status=rejected{{ lq }}">
         Rejected<span class="tab-count">{{ stats.rejected }}</span>
+    </a>
+    <a class="tab tab-toggle {% if linked %}active{% endif %}"
+       href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}{% endif %}{% if not linked %}{% if current_filter %}&{% endif %}linked=1{% endif %}"
+       title="只顯示有高相關筆記的貼文">
+        {% if linked %}✓ {% endif %}只看筆記呼應<span class="tab-count">{{ linked_count }}</span>
     </a>
 </nav>
 
 {% if items %}
     {% for item in items %}
-    <div class="card" data-status="{{ item.status }}">
+    {% set d = item.digest %}
+    {% set is_linkedin = "linkedin.com" in (item.post_link or "") %}
+    <div class="card" data-status="{{ item.status }}" data-queue-id="{{ item.queue_id }}"
+         data-post-id="{{ item.post_id or '' }}" data-link="{{ item.post_link or '' }}"
+         data-linkedin="{{ '1' if is_linkedin else '0' }}">
         <div class="card-header">
             <div class="card-meta">
                 <span class="card-author">
                     {% if item.author %}
-                        {% if "linkedin.com" in (item.post_link or "") %}
+                        {% if is_linkedin %}
                         <a href="https://www.linkedin.com/in/{{ item.author }}/" target="_blank" rel="noopener">{{ item.author }} (LinkedIn)</a>
                         {% else %}
                         <a href="https://x.com/{{ item.author }}" target="_blank" rel="noopener">@{{ item.author }}</a>
@@ -35,83 +45,187 @@
                     {% endif %}
                 </span>
                 <span class="card-status status-{{ item.status }}">{{ item.status }}</span>
-                {% if item.brain_context %}
-                <span class="brain-badge">B</span>
-                {% endif %}
+                {% if item.views %}<span class="card-views" title="Views">{{ item.views }} views</span>{% endif %}
             </div>
             <span class="card-time">{{ item.created_at }}</span>
         </div>
 
-        <div class="post-content truncated" data-raw="{{ item.post_content | e }}">{{ item.post_content }}</div>
-
-        {% if item.bookmarks or item.views %}
-        <div class="engagement-metrics" style="margin: 6px 0;">
-            {% if item.views %}
-            <span class="engagement-metric" title="Views">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                {{ item.views }}
-            </span>
-            {% endif %}
-            {% if item.bookmarks %}
-            <span class="engagement-metric" title="Bookmarks">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                {{ item.bookmarks }}
-            </span>
-            {% endif %}
-        </div>
+        {% if d.points %}
+        <ul class="gist">
+            {% for p in d.points %}<li>{{ p }}</li>{% endfor %}
+        </ul>
         {% endif %}
 
-        {% if item.original_reply %}
-        <div class="reply-preview">
-            <div class="reply-label">// REPLY</div>
-            {{ item.edited_reply or item.original_reply }}
+        <div class="post-content truncated {% if d.points %}post-secondary{% endif %}" data-raw="{{ item.post_content | e }}" title="點一下展開／收合原文">{{ item.post_content }}</div>
+
+        {% if d.links %}
+        <div class="echo">
+            <div class="echo-label">筆記呼應</div>
+            {% for l in d.links %}
+            <div class="echo-item">
+                <span class="note-pill">{{ l.title }}</span>
+                {% if l.why %}<span class="echo-why">{{ l.why }}</span>{% endif %}
+                {% if l.more or (l.why_full and l.why_full != l.why) %}
+                <details class="echo-more">
+                    <summary>展開</summary>
+                    {% if l.why_full and l.why_full != l.why %}<p>{{ l.why_full }}</p>{% endif %}
+                    {% if l.more %}<ul>{% for m in l.more %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+                </details>
+                {% endif %}
+            </div>
+            {% endfor %}
+            {% if d.extra %}<div class="echo-extra">另有 {{ d.extra }} 篇在「完整分析」</div>{% endif %}
         </div>
+        {% elif d.analysed %}
+        <div class="echo-none">筆記：無高相關</div>
         {% endif %}
 
-        {% if item.original_question %}
-        <div class="reply-preview" style="border-left-color: var(--yellow);">
-            <div class="reply-label" style="color: var(--yellow);">// QUESTION</div>
-            {{ item.original_question }}
+        {% if item.status == 'pending' %}
+        {% set reply_text = item.edited_reply or item.original_reply or "" %}
+        <div class="inline-reply">
+            <textarea class="edit-area inline-edit" rows="3"
+                      data-ai-reply="{{ item.original_reply | e }}"
+                      data-ai-question="{{ (item.original_question or '') | e }}"
+                      placeholder="寫回覆…（⌘/Ctrl + Enter 送出）">{{ reply_text }}</textarea>
+            <div class="inline-bar">
+                <span class="inline-count"><span class="char-num">{{ reply_text | length }}</span> chars</span>
+                <div class="card-actions inline-actions">
+                    <button type="button" class="btn btn-approve btn-sm js-reply">{{ "Copy & reply on LinkedIn ↗" if is_linkedin else "Reply on X ↗" }}</button>
+                    {% if item.original_question %}
+                    <button type="button" class="btn btn-save btn-sm js-swap" data-mode="reply">換成提問</button>
+                    {% endif %}
+                    <button type="button" class="btn btn-save btn-sm js-save">存草稿</button>
+                    <button type="button" class="btn btn-reject btn-sm js-reject">Reject</button>
+                    {% if item.post_link %}
+                    <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">原文 ↗</a>
+                    {% endif %}
+                    <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">完整分析</a>
+                </div>
+            </div>
         </div>
+        {% else %}
+            {% if item.original_reply %}
+            <div class="reply-preview">
+                <div class="reply-label">// REPLY</div>
+                {{ item.edited_reply or item.original_reply }}
+            </div>
+            {% endif %}
+            <div class="card-actions">
+                {% if item.post_link %}
+                <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">原文 ↗</a>
+                {% endif %}
+                <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">完整分析</a>
+            </div>
         {% endif %}
-
-        <div class="card-actions">
-            {% if item.status == 'pending' %}
-            {% set reply_text = item.edited_reply or item.original_reply or "" %}
-            {% set post_id = item.post_id or "" %}
-            {% if "linkedin.com" in (item.post_link or "") %}
-            {% if reply_text %}
-            <button type="button" class="btn btn-approve btn-sm" data-queue-id="{{ item.queue_id }}" data-reply="{{ reply_text | e }}" data-link="{{ item.post_link | e }}" onclick="replyOnLinkedIn(this)">Copy &amp; reply on LinkedIn ↗</button>
-            {% endif %}
-            {% elif post_id and reply_text %}
-            <a class="btn btn-approve btn-sm" href="https://x.com/intent/tweet?in_reply_to={{ post_id }}&text={{ reply_text | urlencode }}" target="_blank" rel="noopener" onclick="approveItem('{{ item.queue_id }}', '{{ reply_text | e }}', null)">Reply on X ↗</a>
-            {% endif %}
-            <button type="button" class="btn btn-reject btn-sm" onclick="rejectItem('{{ item.queue_id }}', this)">Reject</button>
-            {% endif %}
-            {% if item.post_link %}
-            <a class="btn btn-link btn-sm" href="{{ item.post_link }}" target="_blank" rel="noopener">{{ "View on LinkedIn" if "linkedin.com" in item.post_link else "View on X" }} ↗</a>
-            {% endif %}
-            <a class="btn btn-detail btn-sm" href="{{ prefix }}/review/{{ item.queue_id }}">Detail →</a>
-        </div>
     </div>
     {% endfor %}
 
     {% if total_pages > 1 %}
     <nav class="pagination">
         {% if page > 1 %}
-        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page - 1 }}">← Prev</a>
+        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page - 1 }}{{ lq }}">← Prev</a>
         {% endif %}
         <span>Page {{ page }} / {{ total_pages }}</span>
         {% if page < total_pages %}
-        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page + 1 }}">Next →</a>
+        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page + 1 }}{{ lq }}">Next →</a>
         {% endif %}
     </nav>
     {% endif %}
 {% else %}
     <div class="empty-state">
         <div class="empty-state-icon">[ --- ]</div>
-        <h2>No items{% if current_filter %} with status "{{ current_filter }}"{% endif %}</h2>
+        <h2>No items{% if current_filter %} with status "{{ current_filter }}"{% endif %}{% if linked %} with a note match{% endif %}</h2>
         <p>When AI-generated replies are created, they'll appear here for review.</p>
     </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Inline reply: read, edit and send from the list without opening the detail page (Bill 2026-11-01).
+    function cardOf(el) { return el.closest('.card'); }
+    function editorOf(card) { return card.querySelector('.inline-edit'); }
+
+    function markDone(card, status, note) {
+        card.dataset.status = status;
+        card.classList.add('card-done');
+        const box = card.querySelector('.inline-reply');
+        if (box) box.remove();
+        if (note) {
+            const p = document.createElement('div');
+            p.className = 'done-note';
+            p.textContent = note;
+            card.appendChild(p);
+        }
+    }
+
+    function updateCount(ta) {
+        const n = cardOf(ta).querySelector('.char-num');
+        if (n) n.textContent = ta.value.length;
+    }
+
+    async function sendReply(card, btn) {
+        const ta = editorOf(card);
+        const text = ta.value.trim();
+        if (!text) { ta.focus(); return; }
+        const qid = card.dataset.queueId;
+        if (card.dataset.linkedin === '1') {
+            btn.dataset.queueId = qid;
+            btn.dataset.reply = text;
+            btn.dataset.link = card.dataset.link;
+            const r = await replyOnLinkedIn(btn);
+            if (r && r.success) markDone(card, 'approved', btn.textContent);
+            return;
+        }
+        if (!card.dataset.postId) { alert('Cannot determine post ID for this item.'); return; }
+        // Open the X composer inside the click handler so the popup blocker allows it,
+        // then record the approval in the background.
+        const url = 'https://x.com/intent/tweet?in_reply_to=' + encodeURIComponent(card.dataset.postId)
+                  + '&text=' + encodeURIComponent(text);
+        window.open(url, '_blank', 'noopener');
+        const r = await approveItem(qid, text, btn);
+        if (r && r.success) markDone(card, 'approved');
+    }
+
+    document.addEventListener('click', async function(e) {
+        const post = e.target.closest('.post-content.truncated, .post-content.expanded');
+        if (post && !e.target.closest('a')) {
+            post.classList.toggle('truncated');
+            post.classList.toggle('expanded');
+            return;
+        }
+        const btn = e.target.closest('.js-reply, .js-swap, .js-save, .js-reject');
+        if (!btn) return;
+        const card = cardOf(btn);
+        const ta = editorOf(card);
+        if (btn.classList.contains('js-reply')) {
+            await sendReply(card, btn);
+        } else if (btn.classList.contains('js-swap')) {
+            const toQuestion = btn.dataset.mode === 'reply';
+            ta.value = toQuestion ? ta.dataset.aiQuestion : ta.dataset.aiReply;
+            btn.dataset.mode = toQuestion ? 'question' : 'reply';
+            btn.textContent = toQuestion ? '換回回覆' : '換成提問';
+            updateCount(ta);
+            ta.focus();
+        } else if (btn.classList.contains('js-save')) {
+            await saveItem(card.dataset.queueId, ta.value.trim(), btn);
+        } else if (btn.classList.contains('js-reject')) {
+            const r = await rejectItem(card.dataset.queueId, btn);
+            if (r && r.success) markDone(card, 'rejected');
+        }
+    });
+
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('inline-edit')) updateCount(e.target);
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (!e.target.classList.contains('inline-edit')) return;
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            const card = cardOf(e.target);
+            sendReply(card, card.querySelector('.js-reply'));
+        }
+    });
+</script>
 {% endblock %}
