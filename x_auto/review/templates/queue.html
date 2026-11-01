@@ -58,10 +58,8 @@
 
         <div class="post-content truncated {% if d.points %}post-secondary{% endif %}" data-raw="{{ item.post_content | e }}" title="點一下展開／收合原文">{{ item.post_content }}</div>
 
-        {% if d.links %}
-        <div class="echo">
-            <div class="echo-label">筆記呼應</div>
-            {% for l in d.links %}
+        {% macro echo_items(links) %}
+            {% for l in links %}
             <div class="echo-item">
                 <span class="note-pill">{{ l.title }}</span>
                 {% if l.why %}<span class="echo-why">{{ l.why }}</span>{% endif %}
@@ -74,14 +72,26 @@
                 {% endif %}
             </div>
             {% endfor %}
-            {% if d.extra %}<div class="echo-extra">另有 {{ d.extra }} 篇在「完整分析」</div>{% endif %}
+        {% endmacro %}
+        {% if d.links and d.fresh %}
+        <div class="echo">
+            <div class="echo-label">筆記呼應</div>
+            {{ echo_items(d.links) }}
         </div>
+        {% elif d.links %}
+        {# Pre-2026-11-01 analysis: its "strong" links were mostly medium relevance, so they stay folded #}
+        <details class="echo-old">
+            <summary>舊版判讀（標準較寬）：{{ d.links | length }} 篇筆記，未必高相關</summary>
+            {{ echo_items(d.links) }}
+        </details>
         {% elif d.analysed %}
         <div class="echo-none">筆記：無高相關</div>
+        {% else %}
+        <div class="echo-none">筆記：未分析</div>
         {% endif %}
 
         {% if item.status == 'pending' %}
-        {% set reply_text = item.edited_reply or item.original_reply or "" %}
+        {% set reply_text = item.edited_reply or item.original_reply or item.original_question or "" %}
         <div class="inline-reply">
             <textarea class="edit-area inline-edit" rows="3"
                       data-ai-reply="{{ item.original_reply | e }}"
@@ -91,7 +101,7 @@
                 <span class="inline-count"><span class="char-num">{{ reply_text | length }}</span> chars</span>
                 <div class="card-actions inline-actions">
                     <button type="button" class="btn btn-approve btn-sm js-reply">{{ "Copy & reply on LinkedIn ↗" if is_linkedin else "Reply on X ↗" }}</button>
-                    {% if item.original_question %}
+                    {% if item.original_question and (item.original_reply or item.edited_reply) %}
                     <button type="button" class="btn btn-save btn-sm js-swap" data-mode="reply">換成提問</button>
                     {% endif %}
                     <button type="button" class="btn btn-save btn-sm js-save">存草稿</button>
@@ -127,7 +137,7 @@
         {% endif %}
         <span>Page {{ page }} / {{ total_pages }}</span>
         {% if page < total_pages %}
-        <a href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page + 1 }}{{ lq }}">Next →</a>
+        <a class="js-next" data-start="{{ start }}" data-per-page="{{ per_page }}" href="{{ prefix }}/review?{% if current_filter %}status={{ current_filter }}&{% endif %}page={{ page + 1 }}{{ lq }}">Next →</a>
         {% endif %}
     </nav>
     {% endif %}
@@ -143,20 +153,40 @@
 {% block scripts %}
 <script>
     // Inline reply: read, edit and send from the list without opening the detail page (Bill 2026-11-01).
+    const ON_PENDING = {{ 'true' if current_filter == 'pending' else 'false' }};
+    const LIST_QS = {{ (("status=" ~ current_filter ~ "&") if current_filter else "") | tojson }} + {{ ("linked=1&" if linked else "") | tojson }};
+    let handledHere = 0;
+
     function cardOf(el) { return el.closest('.card'); }
     function editorOf(card) { return card.querySelector('.inline-edit'); }
 
-    function markDone(card, status, note) {
+    // Answered cards leave the pending list, so "Next" by page number would skip that many.
+    function fixNextLink() {
+        const next = document.querySelector('.js-next');
+        if (!next || !ON_PENDING) return;
+        const offset = Number(next.dataset.start) + Number(next.dataset.perPage) - handledHere;
+        next.href = `${API_PREFIX}/review?${LIST_QS}offset=${offset}`;
+    }
+
+    function markDone(card, status, note, sentText) {
         card.dataset.status = status;
         card.classList.add('card-done');
         const box = card.querySelector('.inline-reply');
         if (box) box.remove();
-        if (note) {
+        if (note || sentText) {
             const p = document.createElement('div');
             p.className = 'done-note';
-            p.textContent = note;
+            p.textContent = note || '';
+            if (sentText) {
+                const q = document.createElement('div');
+                q.className = 'reply-preview';
+                q.textContent = sentText;
+                p.appendChild(q);
+            }
             card.appendChild(p);
         }
+        handledHere += 1;
+        fixNextLink();
     }
 
     function updateCount(ta) {
@@ -165,26 +195,38 @@
     }
 
     async function sendReply(card, btn) {
+        // One send per card: a held or repeated Cmd+Enter opened several X composers (2026-11-01 review).
+        if (card.dataset.sending === '1' || card.classList.contains('card-done') || !btn || btn.disabled) return;
         const ta = editorOf(card);
         const text = ta.value.trim();
         if (!text) { ta.focus(); return; }
         const qid = card.dataset.queueId;
-        if (card.dataset.linkedin === '1') {
-            btn.dataset.queueId = qid;
-            btn.dataset.reply = text;
-            btn.dataset.link = card.dataset.link;
-            const r = await replyOnLinkedIn(btn);
-            if (r && r.success) markDone(card, 'approved', btn.textContent);
-            return;
+        card.dataset.sending = '1';
+        try {
+            if (card.dataset.linkedin === '1') {
+                btn.dataset.queueId = qid;
+                btn.dataset.reply = text;
+                btn.dataset.link = card.dataset.link;
+                const r = await replyOnLinkedIn(btn);
+                // Keep the text on the card: if the copy failed it is the only place left to copy it from.
+                if (r && r.success) markDone(card, 'approved', btn.textContent, text);
+                return;
+            }
+            if (!card.dataset.postId) { alert('Cannot determine post ID for this item.'); return; }
+            // Open the X composer inside the user gesture so the popup blocker allows it,
+            // then record the approval.
+            const url = 'https://x.com/intent/tweet?in_reply_to=' + encodeURIComponent(card.dataset.postId)
+                      + '&text=' + encodeURIComponent(text);
+            window.open(url, '_blank', 'noopener');
+            const r = await approveItem(qid, text, btn);
+            if (r && r.success) {
+                markDone(card, 'approved', '已開啟 X 回覆視窗', text);
+            } else {
+                btn.textContent = 'X 視窗已開，但沒記錄成功：重按會再開一次';
+            }
+        } finally {
+            card.dataset.sending = '';
         }
-        if (!card.dataset.postId) { alert('Cannot determine post ID for this item.'); return; }
-        // Open the X composer inside the click handler so the popup blocker allows it,
-        // then record the approval in the background.
-        const url = 'https://x.com/intent/tweet?in_reply_to=' + encodeURIComponent(card.dataset.postId)
-                  + '&text=' + encodeURIComponent(text);
-        window.open(url, '_blank', 'noopener');
-        const r = await approveItem(qid, text, btn);
-        if (r && r.success) markDone(card, 'approved');
     }
 
     document.addEventListener('click', async function(e) {
@@ -201,8 +243,15 @@
         if (btn.classList.contains('js-reply')) {
             await sendReply(card, btn);
         } else if (btn.classList.contains('js-swap')) {
+            // Keep what is in the box for each mode, so swapping back never loses an edit or a saved draft.
             const toQuestion = btn.dataset.mode === 'reply';
-            ta.value = toQuestion ? ta.dataset.aiQuestion : ta.dataset.aiReply;
+            if (toQuestion) {
+                ta.dataset.replyBuf = ta.value;
+                ta.value = ta.dataset.questionBuf !== undefined ? ta.dataset.questionBuf : ta.dataset.aiQuestion;
+            } else {
+                ta.dataset.questionBuf = ta.value;
+                ta.value = ta.dataset.replyBuf;
+            }
             btn.dataset.mode = toQuestion ? 'question' : 'reply';
             btn.textContent = toQuestion ? '換回回覆' : '換成提問';
             updateCount(ta);
@@ -223,9 +272,13 @@
         if (!e.target.classList.contains('inline-edit')) return;
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
+            if (e.repeat) return;
             const card = cardOf(e.target);
             sendReply(card, card.querySelector('.js-reply'));
         }
     });
+
+    // A page restored from the back/forward cache can show answered cards as pending: reload it.
+    window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });
 </script>
 {% endblock %}

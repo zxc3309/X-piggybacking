@@ -41,7 +41,9 @@ class CacheHeaderMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         content_type = response.headers.get("content-type", "")
         if request.method == "GET" and "text/html" in content_type:
-            response.headers["Cache-Control"] = "private, max-age=10, stale-while-revalidate=20"
+            # no-store: cards are now answered inline, and a cached page brought back a replied
+            # card as pending (2026-11-01 review), inviting a second reply on X.
+            response.headers["Cache-Control"] = "no-store"
         elif request.method == "GET" and "application/json" in content_type:
             response.headers["Cache-Control"] = "no-store"
         return response
@@ -70,13 +72,18 @@ async def index(request: Request):
 
 
 @app.get("/review", response_class=HTMLResponse)
-async def review_queue(request: Request, status: Optional[str] = None, page: int = 1, linked: int = 0):
+async def review_queue(request: Request, status: Optional[str] = None, page: int = 1, linked: str = "",
+                       offset: Optional[int] = None):
     """Show the review queue list, optionally filtered by status.
 
     Each card carries a digest of its brain_context (what the post says + high-relevance notes)
     and an inline reply box, so a post can be read and answered without opening the detail page.
-    linked=1 keeps only posts with at least one high-relevance note.
+    linked=1 keeps only posts whose current-prompt analysis found a high-relevance note
+    (older analyses used a looser bar and are left out).
+    offset: start index used by the Pending tab's Next link, which subtracts the cards already
+    answered inline (they leave the pending list, so page+1 would skip that many).
     """
+    linked = linked == "1"
     per_page = 20
     try:
         if status and status in queue_manager.VALID_STATUSES:
@@ -94,13 +101,20 @@ async def review_queue(request: Request, status: Optional[str] = None, page: int
     # Reverse once server-side (newest first) and paginate
     # Copies, so the digest never lands in queue_manager's shared cache
     items = [{**it, "digest": digest(it.get("brain_context") or "")} for it in reversed(items)]
-    linked_count = sum(1 for it in items if it["digest"]["links"])
+    def _echoes(it):
+        return it["digest"]["fresh"] and it["digest"]["links"]
+    linked_count = sum(1 for it in items if _echoes(it))
     if linked:
-        items = [it for it in items if it["digest"]["links"]]
+        items = [it for it in items if _echoes(it)]
     total_items = len(items)
     total_pages = max(1, (total_items + per_page - 1) // per_page)
-    page = max(1, min(page, total_pages))
-    items = items[(page - 1) * per_page : page * per_page]
+    if offset is not None:
+        start = max(0, min(offset, max(0, total_items - 1)))
+        page = start // per_page + 1
+    else:
+        page = max(1, min(page, total_pages))
+        start = (page - 1) * per_page
+    items = items[start : start + per_page]
 
     return templates.TemplateResponse(
         request,
@@ -113,8 +127,10 @@ async def review_queue(request: Request, status: Optional[str] = None, page: int
             "page": page,
             "total_pages": total_pages,
             "total_items": total_items,
-            "linked": bool(linked),
+            "linked": linked,
             "linked_count": linked_count,
+            "start": start,
+            "per_page": per_page,
         },
     )
 

@@ -44,7 +44,10 @@ class ClaudeCLIProvider(LLMProvider):
                 timeout=timeout, cwd=workdir,
             )
         if proc.returncode != 0:
-            raise RuntimeError(f"claude -p exited {proc.returncode}: {proc.stderr.strip()[:300]}")
+            # With --output-format json the CLI reports errors (usage limit, auth) on stdout and leaves
+            # stderr empty; on 2026-10-31 every call failed as "exited 1: " with the reason lost.
+            detail = proc.stderr.strip() or proc.stdout.strip()
+            raise RuntimeError(f"claude -p exited {proc.returncode}: {detail[:300]}")
         data = json.loads(proc.stdout)
         if data.get("is_error"):
             raise RuntimeError(f"claude -p error: {str(data.get('result'))[:300]}")

@@ -26,13 +26,14 @@ BRAIN_ANALYSIS_PROMPT = """\
 
 ### 直接相關筆記（強連結）
 **[[筆記名稱]]**
-- 連結理由：一句話講具體呼應點，例如這篇貼文補充、挑戰或延伸了筆記裡的哪個觀點
+- 連結理由：一句話同時講兩邊：「貼文的 X 補充／挑戰／延伸了筆記的 Y」。Y 必須是上面筆記摘要裡真的寫到的觀點，不要先介紹筆記在講什麼
 - 延伸思考：一句話講可以怎麼用這個呼應（回覆角度、筆記要補什麼）
 
 判斷標準：
-- 只列「高相關」：能具體講出貼文跟筆記哪一個觀點互相補充、挑戰或延伸。最多 2 篇。
-- 只是主題相近、關鍵字重疊、或要經過好幾步聯想才連得上的，一律不列。
-- 筆記內容是空的，或只有標題（例如 Portfolio Log），沒辦法確認呼應點，就不列。
+- 只列「高相關」：貼文跟筆記討論的是同一個具體主張，而且你能指出筆記摘要裡的哪句話被補充、挑戰或延伸。最多 2 篇。
+- 只是主題相近、關鍵字重疊、同一個作者、或要經過好幾步聯想才連得上的，一律不列。
+- 主題總覽或索引類筆記（例如「5. AI Compute 金融化」這種主題入口卡）、Podcast／文章的摘要筆記，除非貼文回應的正是筆記裡同一個具體主張，否則不列。
+- 筆記摘要是空的、只有標題（例如 Portfolio Log），或你得用「推測」「很可能是」才連得上，就不列。
 - 沒有任何高相關筆記時，「直接相關筆記（強連結）」這段只寫一行：（無高相關筆記）
 
 只輸出分析結果，不要其他說明文字。\
@@ -46,7 +47,11 @@ def _build_notes_context(results: list[dict]) -> str:
         title = r.get("title", "")
         folder = r.get("folder", "")
         tags = ", ".join(r.get("tags", []))
-        content = r.get("content", "")[:400]
+        # cesecondbrain-api stopped returning full "content" (commit df681cf) and sends the
+        # best-matching passages as matched_chunks; reading only "content" left the analysis with
+        # bare titles, so it guessed at what each note says (found 2026-11-01).
+        chunks = [c.get("content", "") for c in (r.get("matched_chunks") or [])[:3]]
+        content = ("\n…\n".join(c for c in chunks if c) or r.get("content", ""))[:900]
         linked = [ln.get("title", "") for ln in r.get("linked_notes", [])]
 
         lines.append(f"### [[{title}]] ({folder})")
