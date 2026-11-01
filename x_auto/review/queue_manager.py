@@ -19,7 +19,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from x_auto.sheets.client import GoogleSheetsClient
+from x_auto.sheets.client import GoogleSheetsClient, write_rows_below
 
 logger = logging.getLogger(__name__)
 
@@ -170,12 +170,12 @@ def add_to_queue(items: List[Dict[str, Any]]) -> int:
         ])
 
     if rows:
-        ws.append_rows(rows, value_input_option="USER_ENTERED")
+        first_row = write_rows_below(ws, rows, len(existing))
         logger.info(f"Added {len(rows)} items to reply_queue")
         # Update cache with new items instead of invalidating
-        for row in rows:
+        for offset, row in enumerate(rows):
             new_item = dict(zip(REPLY_QUEUE_HEADERS, row))
-            new_item["_row_index"] = len(existing) + rows.index(row) + 1
+            new_item["_row_index"] = first_row + offset
             _append_to_cache(new_item)
 
     return len(rows)

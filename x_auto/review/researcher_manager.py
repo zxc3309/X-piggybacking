@@ -15,7 +15,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from x_auto.sheets.client import GoogleSheetsClient
+from x_auto.sheets.client import GoogleSheetsClient, write_rows_below
 
 logger = logging.getLogger(__name__)
 
@@ -168,12 +168,12 @@ def add_researcher(data: Dict[str, str]) -> bool:
                 break
         row.append(value)
 
-    ws.append_row(row, value_input_option="USER_ENTERED")
+    row_index = write_rows_below(ws, [row], len(all_values))
     logger.info(f"Added researcher: {data.get('name', '?')} ({data.get('handle', '?')})")
 
     # Update cache
     new_item = dict(zip(headers, row))
-    new_item["_row_index"] = len(all_values) + 1
+    new_item["_row_index"] = row_index
     _append_to_cache(new_item)
 
     return True

@@ -188,6 +188,28 @@ class GoogleSheetsClient:
         worksheet.append_row(row, value_input_option="USER_ENTERED")
 
 
+def write_rows_below(worksheet: gspread.Worksheet, rows: List[List[Any]], existing_count: int) -> int:
+    """
+    Write rows starting at an explicit row number, right below the rows just read.
+
+    Worksheet.append_row(s) lets Sheets guess where the table ends. On 2026-11-02 that
+    guess put a new Researcher row on top of an existing one (row 32 was overwritten), so
+    writes that add records go to row existing_count + 1 instead, and refuse to run if
+    those rows are no longer empty (someone added a row since the read).
+
+    Returns:
+        The 1-based row number of the first written row.
+    """
+    start = existing_count + 1
+    end = existing_count + len(rows)
+    if end > worksheet.row_count:
+        worksheet.add_rows(end - worksheet.row_count)
+    elif any(any(cell for cell in r) for r in worksheet.get(f"A{start}:{gspread.utils.rowcol_to_a1(end, worksheet.col_count)}")):
+        raise RuntimeError(f"Rows {start}-{end} of '{worksheet.title}' are not empty; re-read before writing")
+    worksheet.update(f"A{start}", rows, value_input_option="USER_ENTERED")
+    return start
+
+
 # Backward-compatible placeholders for higher-level workflow stubs.
 def get_sheet_client(spreadsheet_name: str) -> GoogleSheetsClient:
     """
