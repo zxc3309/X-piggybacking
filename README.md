@@ -13,10 +13,10 @@ This project automates X (Twitter) monitoring: scrapes posts from target profile
 - **Smart summaries** - Generate concise headlines for quick review
 - **Reply generation** - AI-powered reply recommendations
 - **Question recommendations** - Suggested follow-up questions for engagement
-- **Review Dashboard** - Web UI for approve/reject/edit reply candidates
+- **Review Dashboard** - Web UI for approve/reject/edit reply candidates. Each queue card shows a 3-line gist of the post, up to two high-relevance Second Brain notes, and an inline reply box (Reply on X / swap to question / save / reject, Cmd+Enter to send), so posts are answered from the list without opening the detail page
 - **Pickyback demo (`/demo`)** - Embeddable single-post dashboard branded as "Pickyback" running a real X post (@karpathy's "LLM Knowledge Bases" thread) through the full pipeline; the "Reply on X" button opens the native X composer via `intent/tweet?in_reply_to=...` so visitors can actually reply (Second Brain notes and drafted reply are pre-computed — no API calls fire from the page)
 - **Auto-sender** - Posts approved replies to X with daily limits (17/day for X Free tier)
-- **Second Brain integration** - Query personal knowledge base (cesecondbrain-api) for related notes, enrich replies with your own perspective
+- **Second Brain integration** - Query personal knowledge base (cesecondbrain-api) for related notes, enrich replies with your own perspective. The analysis keeps only high-relevance notes (max 2) and reads note text from the API's `matched_chunks`; `x_auto/review/brain_digest.py` condenses it for the queue cards
 - **Telegram notifications** - Daily summaries organized by category with emoji indicators
 - **Google Sheets logging** - Track all posts, decisions, and reply queue
 - **Scheduled execution** - Run on Railway with APScheduler (daily scrape + 5-min reply checks)
@@ -326,6 +326,7 @@ The review dashboard provides a web UI for managing AI-generated reply candidate
 |----------|--------|-------------|
 | `/review` | GET | List all pending replies |
 | `/review?status=approved` | GET | Filter by status |
+| `/review?linked=1` | GET | Only posts whose current analysis found a high-relevance note |
 | `/review/{queue_id}` | GET | Detail view for editing |
 | `/review/{id}/approve` | POST | Approve with optional edit |
 | `/review/{id}/reject` | POST | Reject a reply |
