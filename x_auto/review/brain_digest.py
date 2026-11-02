@@ -25,6 +25,7 @@ _POINT_MAX = 80
 _SHORT_LEAD = 10
 _WHY_FULL_SHOWN = 90
 _WHY_MAX = 120
+_LEAD_IN_MAX = 25
 _MAX_LINKS = 2  # same cap the analysis prompt uses
 
 
@@ -38,8 +39,13 @@ def _cap(text: str, cap: int) -> str:
     return text if len(text) <= cap else text[: cap - 1] + "…"
 
 
-def _first_sentence(text: str, cap: int) -> str:
-    return _cap(re.split(r"(?<=[。！？!?])\s*", text, maxsplit=1)[0], cap)
+def _first_sentence(text: str, cap: int, keep_lead_in: bool = False) -> str:
+    parts = re.split(r"(?<=[。！？!?])\s*", text)
+    lead = parts[0]
+    # A short reason lead-in ("Jump 的租金 put 佐證了筆記的兩個判斷。") says nothing alone; keep the next sentence.
+    if keep_lead_in and len(lead) < _LEAD_IN_MAX and len(parts) > 1:
+        lead += parts[1]
+    return _cap(lead, cap)
 
 
 def _short_point(line: str) -> str:
@@ -71,7 +77,7 @@ def _sections(text: str) -> Dict[str, List[str]]:
 
 def _finish(note: Dict) -> None:
     why = note["why_full"]
-    note["why"] = why if len(why) <= _WHY_FULL_SHOWN else _first_sentence(why, _WHY_MAX)
+    note["why"] = why if len(why) <= _WHY_FULL_SHOWN else _first_sentence(why, _WHY_MAX, keep_lead_in=True)
 
 
 def _parse_links(lines: List[str]) -> List[Dict]:
