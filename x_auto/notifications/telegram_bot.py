@@ -15,13 +15,28 @@ import asyncio
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 
+import httpx
 from telegram import Bot
 from telegram.error import TelegramError, NetworkError, Forbidden
 from telegram.constants import ParseMode
+from telegram.request import HTTPXRequest
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# httpx logs every request URL at INFO, and Telegram URLs carry the bot token.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
+# The daily summary timed out with the library defaults (5s) on 2026-11-04.
+_CONNECT_TIMEOUT = 10
+_READ_TIMEOUT = 20
+_SEND_ATTEMPTS = 3
+_RETRY_DELAY = 5
+
+
+def _never_reached_telegram(error: NetworkError) -> bool:
+    """True when the request failed before Telegram got it, so a retry cannot send it twice."""
+    return isinstance(error.__cause__, (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout))
 
 # Category emoji and display name mappings
 CATEGORY_EMOJIS = {
@@ -70,33 +85,40 @@ async def _send_message_async(bot_token: str, chat_id: str, message: str, parse_
     Returns:
         True if message sent successfully, False otherwise
     """
-    try:
-        bot = Bot(token=bot_token)
-        async with bot:
-            await bot.send_message(
-                chat_id=chat_id,
-                text=message,
-                parse_mode=parse_mode,
-                disable_web_page_preview=False  # Show link previews
-            )
-        logger.info(f"Telegram message sent successfully to chat {chat_id}")
-        return True
+    for attempt in range(1, _SEND_ATTEMPTS + 1):
+        try:
+            bot = Bot(token=bot_token, request=HTTPXRequest(connect_timeout=_CONNECT_TIMEOUT, read_timeout=_READ_TIMEOUT))
+            async with bot:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=message,
+                    parse_mode=parse_mode,
+                    disable_web_page_preview=False  # Show link previews
+                )
+            logger.info(f"Telegram message sent successfully to chat {chat_id}")
+            return True
 
-    except Forbidden as e:
-        logger.critical(f"Telegram bot token is invalid or unauthorized: {e}")
-        return False
+        except Forbidden as e:
+            logger.critical(f"Telegram bot token is invalid or unauthorized: {e}")
+            return False
 
-    except NetworkError as e:
-        logger.error(f"Telegram network error: {e}")
-        return False
+        except NetworkError as e:
+            cause = type(e.__cause__).__name__ if e.__cause__ else "none"
+            # A read or write timeout may mean Telegram already delivered it; retrying could send it twice.
+            if attempt < _SEND_ATTEMPTS and _never_reached_telegram(e):
+                logger.warning(f"Telegram network error ({cause}), retrying in {_RETRY_DELAY}s: {e}")
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+            logger.error(f"Telegram network error ({cause}): {e}")
+            return False
 
-    except TelegramError as e:
-        logger.error(f"Telegram API error: {e}")
-        return False
+        except TelegramError as e:
+            logger.error(f"Telegram API error: {e}")
+            return False
 
-    except Exception as e:
-        logger.error(f"Unexpected error sending Telegram message: {e}", exc_info=True)
-        return False
+        except Exception as e:
+            logger.error(f"Unexpected error sending Telegram message: {e}", exc_info=True)
+            return False
 
 
 def escape_html(text: str) -> str:
